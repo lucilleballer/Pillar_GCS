@@ -257,41 +257,42 @@ float UAVTalk::get_float(uavtalk_message_t *msg, int pos) {
 void UAVTalk::send_msg(uavtalk_message_t *msg) {
 	uint8_t *d;
 	uint8_t i;
-	uint8_t c;
+	char c;
 
-	c = (uint8_t) (msg->Sync);
-	serial.write(c);
-	msg->Crc = crc[0];
-	c = (uint8_t) (msg->MsgType);
-	serial.write(c);
-	msg->Crc = crc[msg->Crc ^ c];
-	c = (uint8_t) (msg->Length & 0xff);
-	serial.write(c);
+	c = (char) (msg->Sync);
+	serial->write(&c);
+	msg->Crc = crc_table[0];
+	c = (char) (msg->MsgType);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
-	c = (uint8_t) ((msg->Length >> 8) & 0xff);
-	serial.write(c);
+	c = (char) (msg->Length & 0xff);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
-	c = (uint8_t) (msg->ObjID & 0xff);
-	serial.write(c);
+	c = (char) ((msg->Length >> 8) & 0xff);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
-	c = (uint8_t) ((msg->ObjID >> 8) & 0xff);
-	serial.write(c);
+	c = (char) (msg->ObjID & 0xff);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
-	c = (uint8_t) ((msg->ObjID >> 16) & 0xff);
-	serial.write(c);
+	c = (char) ((msg->ObjID >> 8) & 0xff);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
-	c = (uint8_t) ((msg->ObjID >> 24) & 0xff);
-	serial.write(c);
+	c = (char) ((msg->ObjID >> 16) & 0xff);
+	serial->write(&c);
+	msg->Crc = crc_table[msg->Crc ^ c];
+	c = (char) ((msg->ObjID >> 24) & 0xff);
+	serial->write(&c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	if (msg->Length > 8) {
 		d = msg->Data;
 		for (i=0; i<msg->Length-8; i++) {
 			c = *d++;
-			serial.write(c);
+			serial->write(&c);
 			msg->Crc = crc_table[msg->Crc ^ c];
 		}
 	}
-	serial.write(msg->Crc);
+	c = msg->Crc;
+	serial->write(&c);
 }
 
 void UAVTalk::respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
@@ -300,9 +301,9 @@ void UAVTalk::respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
 	msg.Sync 	= UAVTALK_SYNC_VAL;
 	msg.MsgType = type;
 	msg.Length 	= RESPOND_OBJ_LEN;
-	msg.ObjID	= msg-To_respond->ObjID;
+	msg.ObjID	= msg_to_respond->ObjID;
 
-	uavtalk_send_msg(&msg);
+	send_msg(&msg);
 }
 
 void UAVTalk::send_gcstelemetrystats(void) {

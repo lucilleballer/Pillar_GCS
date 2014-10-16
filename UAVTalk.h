@@ -122,6 +122,8 @@
 #define MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_7              40
 #define MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_8              42
 
+#define	RESPOND_OBJ_LEN					8
+
 // Structure for the UAVTalk message
 typedef struct __uavtalk_message {
 	uint8_t Sync;

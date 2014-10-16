@@ -1,0 +1,8 @@
+# Vim swap files
+*.swp
+
+# C Obj Files
+*.o
+
+# Project file
+
