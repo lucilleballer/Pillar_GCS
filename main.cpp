@@ -10,10 +10,44 @@ using namespace std;
 
 int main(int argc, char *argv[]) {
 	QCoreApplication app(argc, argv);
+	cout << "Pillar GCS v0.01\n";
 	UAVTalk uavtalk;
 
-	cout << "Pillar GCS v0.01\n";
-	do { 
+	//while(1) cerr << uavtalk.readByte();
+
+	uavtalk_message_t msg;
+	
+	for (int i = 0; i < 1000; ++i) {
+	while(!uavtalk.read(msg));
+	//cout << "Sync: " << (int) msg.Sync << endl;
+	//cout << "Type: " << (int) msg.MsgType << endl;
+	//cout << "Length: " << (int) msg.Length << endl;
+	cout << "ObjID: " << (unsigned int) msg.ObjID << endl;
+	cout << "InstID: " << (int) msg.InstID << endl;
+	for (int i = 0; i < 255; ++i)
+		cout << (char) msg.Data[i];
+	cout << "\nCrc: " << (int) msg.Crc << endl;
+	cout << endl;
+
+	cout << "RSSI: " << (int) uavtalk.uav_rssi << endl;
+	cout << "Link: " << (int) uavtalk.uav_linkquality << endl;
+	cout << "Roll: " << uavtalk.uav_roll << endl;
+	cout << "Pitch: " << uavtalk.uav_pitch << endl;
+	cout << "Heading: " << uavtalk.uav_heading << endl;
+	cout << "Batt: " << (int) uavtalk.uav_bat << endl;
+	cout << "Alt: " << (int) uavtalk.uav_alt << endl;
+	cout << "Arm: " << (int) uavtalk.uav_arm << endl;
+	cout << "Flight mode: " << (int) uavtalk.uav_flightmode << endl;
+	//uint32_t uav_lat;
+	//uint32_t uav_lon;
+	cout << "Satellites visible: " << (int) uavtalk.uav_satellites_visible << endl;
+	cout << "GPS Heading: " << (int) uavtalk.uav_gpsheading << endl;
+	cout << "Ground speed: " << (int) uavtalk.uav_groundspeed << endl;
+	cout << "Current: " << (int) uavtalk.uav_current << endl;
+	cout << "Amp: " << (int) uavtalk.uav_amp << endl;
+	}
+
+	/*do { 
 		uavtalk.write(0x42);
 	} while (uavtalk.readByte() != 0x42);
 
@@ -29,7 +63,9 @@ int main(int argc, char *argv[]) {
 		cout << (short)temp << '\t';
 	}
 	cout << endl;
-	}
+	}*/
+
+
 
 
 	return app.exec();

@@ -30,20 +30,25 @@
 #define	FLIGHTSTATUS_OBJID_002              0x1B7AEB74      // OP next
 #define FLIGHTSTATUS_OBJID_003              0x0B37AA16      // OP
 #define FLIGHTSTATUS_OBJID_004              0x6CECFBC2      // Taulabs 
-#define FLIGHTSTATUS_OBJID_005              0xC2E431BA      // Taulabs current next.
+#define FLIGHTSTATUS_OBJID_005              0xC5FF2D54      // Taulabs current next.
 #define	MANUALCONTROLCOMMAND_OBJID          0x5C2F58AC      // Taulabs ( only used for RSSI )
 #define MANUALCONTROLCOMMAND_OBJID_001      0xB8C7F78A      // different ID for 14.02.01
 #define GPSPOSITION_OBJID                   0xE2A323B6
 #define GPSPOSITION_OBJID_001               0x40BCC84E      // new Taulabs next ID.
 #define GPSPOSITIONSENSOR_OBJID             0x1A5748CE      // new name since VERSION_RELEASE_14_02_1
 #define AIRSPEEDACTUAL_OBJID                0x133A3280
+#define AIRSPEEDACTUAL_OBJID_001			0xC7009F28
 #define FLIGHTBATTERYSTATE_OBJID            0xD2083596
+#define FLIGHTBATTERYSTATE_OBJID_001		0x26962352
 #define BAROALTITUDE_OBJID                  0x99622E6A
 #define BAROSENSOR_OBJID                    0x48120EA6      // new name since VERSION_RELEASE_14_02_1
 
 #define OPLINKSTATUS_OBJID                  0x669C55E2
 #define OPLINKSTATUS_OBJID_001              0xBE2584BA
 
+#define ACCELSTATE_OBJID					0xAD3C0E06
+
+#define GYROSTATE_OBJID						0x8C2D810A
 
 #define FLIGHTTELEMETRYSTATS_OBJ_LEN            21
 #define	FLIGHTTELEMETRYSTATS_OBJ_STATUS			20
@@ -122,6 +127,14 @@
 #define MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_7              40
 #define MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_8              42
 
+#define ACCELSTATE_OBJ_X				0
+#define ACCELSTATE_OBJ_Y				4
+#define ACCELSTATE_OBJ_Z				8
+
+#define GYRO_OBJ_X						0
+#define GYRO_OBJ_Y						4
+#define GYRO_OBJ_Z						8
+
 #define	RESPOND_OBJ_LEN					8
 
 // Structure for the UAVTalk message
@@ -188,12 +201,34 @@ class UAVTalk : public QObject
 
 		// Read from the serial stream
 		//void read(void);
+		int read(uavtalk_message_t& msg);
 
 		// Get the state
 		int state(void);
 
 		void write(uint8_t in);
 		uint8_t readByte(void);
+
+		uint8_t uav_rssi;
+		uint8_t uav_linkquality;
+		uint8_t uav_failsafe;
+		uint8_t uav_arm;
+		uint8_t uav_flightmode;
+		int16_t uav_roll;
+		int16_t uav_pitch;
+		int16_t uav_heading;
+		int32_t uav_lat;
+		int32_t uav_lon;
+		uint8_t uav_satellites_visible;
+		uint8_t uav_fix_type;
+		int16_t uav_gpsheading;
+		int32_t uav_alt;
+		uint16_t uav_groundspeed;
+		uint16_t uav_bat;
+		uint16_t uav_current;
+		uint16_t uav_amp;
+
+		//uint8_t crc;
 
 	private:
 		void openSerialPort();
@@ -231,26 +266,8 @@ class UAVTalk : public QObject
 		uint8_t gcstelemetrystats_obj_len;
 		uint8_t gcstelemetrystats_obj_status;
 		uint8_t flighttelemetrystats_obj_status;
-		uint8_t uav_rssi;
-		uint8_t uav_linkquality;
-		uint8_t uav_failsafe;
-		uint8_t uav_arm;
-		uint8_t uav_flightmode;
-		uint16_t uav_roll;
-		uint16_t uav_pitch;
-		uint16_t uav_heading;
-		uint32_t uav_lat;
-		uint32_t uav_lon;
-		uint8_t uav_satellites_visible;
-		uint8_t uav_fix_type;
-		uint16_t uav_gpsheading;
-		uint32_t uav_alt;
-		uint16_t uav_groundspeed;
-		uint16_t uav_bat;
-		uint16_t uav_current;
-		uint16_t uav_amp;
 
 	public slots:
-		int read();
+		//int read(uavtalk_message_t msg);
 };
 

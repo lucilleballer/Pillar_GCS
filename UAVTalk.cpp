@@ -41,6 +41,25 @@ UAVTalk::UAVTalk() {
 	gcstelemetrystats_obj_status = 0;
 	flighttelemetrystats_obj_status = 0;
 
+	uav_rssi = 0;
+	uav_linkquality = 0;
+	uav_failsafe = 0;
+	uav_arm = 0;
+	uav_flightmode = 0;
+	uav_roll = 0;
+	uav_pitch = 0;
+	uav_heading = 0;
+	uav_lat = 0;
+	uav_lon = 0;
+	uav_satellites_visible = 0;
+	uav_fix_type = 0;
+	uav_gpsheading = 0;
+	uav_alt = 0;
+	uav_groundspeed = 0;
+	uav_bat = 0;
+	uav_current = 0;
+	uav_amp = 0;
+
 	// Make serialport and set the configs
 	serial = new QSerialPort(this);
 	//connect(serial, SIGNAL(readyRead()), this, SLOT(read()));
@@ -52,22 +71,28 @@ UAVTalk::~UAVTalk() {
 }
 
 // Read from the serial stream
-int UAVTalk::read(void) {
+int UAVTalk::read(uavtalk_message_t& msg) {
 	static uint8_t crlf_count = 0;
-	static uavtalk_message_t msg;
+	//uavtalk_message_t msg;
 	uint8_t show_prio_info = 0;
 	bool telemetry_ok = false;
 
+	//cerr << serial->bytesAvailable() << endl;
+	//cerr << readByte();
 	// Grab data
+	serial->waitForReadyRead(50);
 	while (serial->bytesAvailable() > 0) {
 		// read in one byte
-		uint8_t c = serial->read(1).at(0);
+		uint8_t c = (uint8_t) serial->read(1).at(0);
+		//uint8_t c = readByte();
+		//cerr << c;
 
 		// parse data to msg
 		if (parse_char(c, &msg)) {
 			//telemetry_ok = true;
 			//lastpacketreceived = millis();
 			// consume msg
+			//cerr << msg.ObjID << endl;
 			switch (msg.ObjID) {
 				case FLIGHTTELEMETRYSTATS_OBJID:
 				case FLIGHTTELEMETRYSTATS_OBJID_001:
@@ -91,9 +116,15 @@ int UAVTalk::read(void) {
 				case ATTITUDESTATE_OBJID:
 					//last_flighttelemetry_connect = millis();
 					show_prio_info = 1;
-					uav_roll = (int16_t) get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
-					uav_pitch = (int16_t) get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
-					uav_heading	= (int16_t) get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
+					uav_roll =  (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_ROLL);
+					uav_pitch = (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_PITCH);
+					uav_heading	= (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_YAW);
+					//cerr << "Roll: " << uav_roll << endl;
+					break;
+				case ACCELSTATE_OBJID:
+					//uav_roll = (int16_t) get_int16(&msg, ACCELSTATE_OBJ_X);
+
+					//cerr << "Roll: " << uav_roll << endl;
 					break;
 				case FLIGHTSTATUS_OBJID:
 				case FLIGHTSTATUS_OBJID_001:
@@ -168,8 +199,9 @@ int UAVTalk::read(void) {
 
 			}
 			if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
-				//uavtalk_respond_object(&msg, UAVTALK_TYPE_ACK);
+				respond_object(&msg, UAVTALK_TYPE_ACK);
 			}
+			return 1;
 		}
 
 		//delayMicroseconds(190);  // wait at least 1 byte
@@ -186,7 +218,9 @@ int UAVTalk::read(void) {
 		uavtalk_send_gcstelemetrystats();
 	}*/
 
-	return show_prio_info;
+	//return show_prio_info;
+	//return msg;
+	return 0;
 }
 
 uint8_t UAVTalk::readByte(void) {
@@ -207,7 +241,7 @@ int UAVTalk::state(void) {
 
 void UAVTalk::openSerialPort() {
 	serial->setPortName("/dev/ttyUSB0");
-	serial->setBaudRate(QSerialPort::Baud9600);
+	serial->setBaudRate(QSerialPort::Baud57600);
 	serial->setDataBits(QSerialPort::Data8);
 	serial->setParity(QSerialPort::NoParity);
 	serial->setStopBits(QSerialPort::OneStop);
@@ -324,7 +358,7 @@ uint8_t UAVTalk::parse_char(uint8_t c, uavtalk_message_t *msg) {
 			if (c == UAVTALK_SYNC_VAL) {
 				status = UAVTALK_PARSE_STATE_GOT_SYNC;
 				msg->Sync = c;
-				crc = crc_table[0];
+				crc = crc_table[0 ^ c];
 			}
 			break;
 		case UAVTALK_PARSE_STATE_GOT_SYNC:
@@ -398,6 +432,7 @@ uint8_t UAVTalk::parse_char(uint8_t c, uavtalk_message_t *msg) {
 
 	if (status == UAVTALK_PARSE_STATE_GOT_CRC) {
 		status = UAVTALK_PARSE_STATE_WAIT_SYNC;
+		//cerr << (int) crc << "   " << (int) msg->Crc << endl;
 		if (crc == msg->Crc) {
 			return msg->Length;
 		} else {
