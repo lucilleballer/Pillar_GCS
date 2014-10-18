@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <QtEndian>
 #include "UAVTalk.h"
 
 using namespace std;
@@ -116,13 +117,13 @@ int UAVTalk::read(uavtalk_message_t& msg) {
 				case ATTITUDESTATE_OBJID:
 					//last_flighttelemetry_connect = millis();
 					show_prio_info = 1;
-					uav_roll =  (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_ROLL);
-					uav_pitch = (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_PITCH);
-					uav_heading	= (int16_t) get_int16(&msg, ATTITUDEACTUAL_OBJ_YAW);
+					uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
+					uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
+					uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
 					//cerr << "Roll: " << uav_roll << endl;
 					break;
 				case ACCELSTATE_OBJID:
-					//uav_roll = (int16_t) get_int16(&msg, ACCELSTATE_OBJ_X);
+					//uav_roll = get_float(&msg, ACCELSTATE_OBJ_X);
 
 					//cerr << "Roll: " << uav_roll << endl;
 					break;
@@ -270,20 +271,35 @@ int8_t UAVTalk::get_int8(uavtalk_message_t *msg, int pos) {
 // return an int16 from the ms
 int16_t UAVTalk::get_int16(uavtalk_message_t *msg, int pos) {
 	int16_t i;
+	//i = qFromLittleEndian<qint16>(msg->Data+pos);
 	memcpy(&i, msg->Data+pos, sizeof(int16_t));
+	//i = qToLittleEndian<qint16>(i);
 	return i;
 }
 
 int32_t UAVTalk::get_int32(uavtalk_message_t *msg, int pos) {
 	int32_t i;
-	memcpy(&i, msg->Data+pos, sizeof(int32_t));
+	i = qFromLittleEndian<qint32>(msg->Data+pos);
+	//memcpy(&i, msg->Data+pos, sizeof(int32_t));
 	return i;
 }
 
 // return an float from the ms
 float UAVTalk::get_float(uavtalk_message_t *msg, int pos) {
+	uint32_t temp;
 	float f;
-	memcpy(&f, msg->Data+pos, sizeof(float));
+	cerr << "i1: " << (int) *(msg->Data+pos+3+2) << endl;
+	cerr << "i2: " << (int) *(msg->Data+pos+2+2) << endl;
+	cerr << "i3: " << (int) *(msg->Data+pos+1+2) << endl;
+	cerr << "i4: " << (int) *(msg->Data+pos+0+2) << endl;
+	temp = *(msg->Data+pos+2) | (*(msg->Data+pos+1+2) << 8) |
+		(*(msg->Data+pos+2+2) << 16) | (*(msg->Data+pos+3+2) << 24);
+	memcpy(&f, &temp, sizeof(float));
+	//temp = *(msg->Data+22);
+	//cerr << "TEMP: " << temp << endl;
+	//memcpy(&f, &temp, sizeof(float));
+	//f = qFromBigEndian<quint32>(msg->Data+pos);
+	//memcpy(&f, msg->Data+pos, sizeof(float));
 	return f;
 }
 

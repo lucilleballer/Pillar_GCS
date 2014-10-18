@@ -17,34 +17,40 @@ int main(int argc, char *argv[]) {
 
 	uavtalk_message_t msg;
 	
-	for (int i = 0; i < 1000; ++i) {
+	for (int i = 0; i < 100000; ++i) {
 	while(!uavtalk.read(msg));
 	//cout << "Sync: " << (int) msg.Sync << endl;
 	//cout << "Type: " << (int) msg.MsgType << endl;
 	//cout << "Length: " << (int) msg.Length << endl;
-	cout << "ObjID: " << (unsigned int) msg.ObjID << endl;
-	cout << "InstID: " << (int) msg.InstID << endl;
-	for (int i = 0; i < 255; ++i)
-		cout << (char) msg.Data[i];
-	cout << "\nCrc: " << (int) msg.Crc << endl;
+	//cout << "ObjID: " << (unsigned int) msg.ObjID << endl;
+	cout << "Data Length: " << msg.Length << endl;
+	//cout << "InstID: " << (int) msg.InstID << endl;
+	if (msg.ObjID == 3621837156) {
+		for (int i = 2; i < msg.Length-8; ++i) {
+			if ((i-2) % 8 == 0) cout << endl;
+			cout << (int) msg.Data[i] << '\t';
+		}
+	}
 	cout << endl;
+	cout << endl;
+	//cout << "\nCrc: " << (int) msg.Crc << endl;
 
 	cout << "RSSI: " << (int) uavtalk.uav_rssi << endl;
 	cout << "Link: " << (int) uavtalk.uav_linkquality << endl;
-	cout << "Roll: " << uavtalk.uav_roll << endl;
+	cout << "Roll: " << (float) uavtalk.uav_roll << endl;
 	cout << "Pitch: " << uavtalk.uav_pitch << endl;
 	cout << "Heading: " << uavtalk.uav_heading << endl;
-	cout << "Batt: " << (int) uavtalk.uav_bat << endl;
+	/*cout << "Batt: " << (int) uavtalk.uav_bat << endl;
 	cout << "Alt: " << (int) uavtalk.uav_alt << endl;
 	cout << "Arm: " << (int) uavtalk.uav_arm << endl;
-	cout << "Flight mode: " << (int) uavtalk.uav_flightmode << endl;
+	cout << "Flight mode: " << (int) uavtalk.uav_flightmode << endl;*/
 	//uint32_t uav_lat;
 	//uint32_t uav_lon;
-	cout << "Satellites visible: " << (int) uavtalk.uav_satellites_visible << endl;
+	/*cout << "Satellites visible: " << (int) uavtalk.uav_satellites_visible << endl;
 	cout << "GPS Heading: " << (int) uavtalk.uav_gpsheading << endl;
 	cout << "Ground speed: " << (int) uavtalk.uav_groundspeed << endl;
 	cout << "Current: " << (int) uavtalk.uav_current << endl;
-	cout << "Amp: " << (int) uavtalk.uav_amp << endl;
+	cout << "Amp: " << (int) uavtalk.uav_amp << endl;*/
 	}
 
 	/*do { 

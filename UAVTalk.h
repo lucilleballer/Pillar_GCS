@@ -214,9 +214,9 @@ class UAVTalk : public QObject
 		uint8_t uav_failsafe;
 		uint8_t uav_arm;
 		uint8_t uav_flightmode;
-		int16_t uav_roll;
-		int16_t uav_pitch;
-		int16_t uav_heading;
+		float uav_roll;
+		float uav_pitch;
+		float uav_heading;
 		int32_t uav_lat;
 		int32_t uav_lon;
 		uint8_t uav_satellites_visible;
