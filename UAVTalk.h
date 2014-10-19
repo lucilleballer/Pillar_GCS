@@ -6,8 +6,13 @@
  * Etc:			Code based on code written by Joerg-D. Rothfuchs
  */
 
+#ifndef UAVTALK_H
+#define UAVTALK_H
+
 #include <stdint.h>
 #include <QSerialPort>
+
+class MainWindow;
 
 #define UAVTALK_SYNC_VAL				0x3C
 #define UAVTALK_TYPE_MASK				0xF8
@@ -131,9 +136,9 @@
 #define ACCELSTATE_OBJ_Y				4
 #define ACCELSTATE_OBJ_Z				8
 
-#define GYRO_OBJ_X						0
-#define GYRO_OBJ_Y						4
-#define GYRO_OBJ_Z						8
+#define GYROSTATE_OBJ_X						0
+#define GYROSTATE_OBJ_Y						4
+#define GYROSTATE_OBJ_Z						8
 
 #define	RESPOND_OBJ_LEN					8
 
@@ -195,7 +200,7 @@ class UAVTalk : public QObject
 	Q_OBJECT
 
 	public:
-		UAVTalk();
+		UAVTalk(MainWindow *mainwindow);
 
 		~UAVTalk();
 
@@ -206,17 +211,33 @@ class UAVTalk : public QObject
 		// Get the state
 		int state(void);
 
+		void openSerialPort();
+
 		void write(uint8_t in);
 		uint8_t readByte(void);
 
+		// These are made public for debugging
 		uint8_t uav_rssi;
 		uint8_t uav_linkquality;
+
 		uint8_t uav_failsafe;
 		uint8_t uav_arm;
 		uint8_t uav_flightmode;
+
 		float uav_roll;
 		float uav_pitch;
 		float uav_heading;
+
+		// Accelerometer 
+		float uav_accel_x;
+		float uav_accel_y;
+		float uav_accel_z;
+
+		// Gyroscope
+		float uav_gyro_x;
+		float uav_gyro_y;
+		float uav_gyro_z;
+
 		int32_t uav_lat;
 		int32_t uav_lon;
 		uint8_t uav_satellites_visible;
@@ -224,6 +245,7 @@ class UAVTalk : public QObject
 		int16_t uav_gpsheading;
 		int32_t uav_alt;
 		uint16_t uav_groundspeed;
+
 		uint16_t uav_bat;
 		uint16_t uav_current;
 		uint16_t uav_amp;
@@ -231,7 +253,6 @@ class UAVTalk : public QObject
 		//uint8_t crc;
 
 	private:
-		void openSerialPort();
 		void closeSerialPort();
 
 		// return an int8 from the ms
@@ -256,9 +277,6 @@ class UAVTalk : public QObject
 
 		uint8_t parse_char(uint8_t c, uavtalk_message_t *msg);
 
-
-		QSerialPort *serial;
-
 		unsigned long last_gcstelemetrystats_send;
 		unsigned long last_flighttelemetry_connect;
 		uint8_t gcstelemetrystatus;
@@ -267,7 +285,11 @@ class UAVTalk : public QObject
 		uint8_t gcstelemetrystats_obj_status;
 		uint8_t flighttelemetrystats_obj_status;
 
+		QSerialPort *serial;
+		MainWindow *mainwindow;
+
 	public slots:
-		//int read(uavtalk_message_t msg);
+		int read();
 };
 
+#endif

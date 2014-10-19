@@ -10,6 +10,7 @@
 #include <cmath>
 #include <QtEndian>
 #include "UAVTalk.h"
+#include "mainwindow.h"
 
 using namespace std;
 
@@ -33,7 +34,7 @@ const static uint8_t crc_table[] = {
 	0xde, 0xd9, 0xd0, 0xd7, 0xc2, 0xc5, 0xcc, 0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3
 };
 
-UAVTalk::UAVTalk() {
+UAVTalk::UAVTalk(MainWindow* parent=0) {
 	last_gcstelemetrystats_send = 0;
 	last_flighttelemetry_connect = 0;
 	gcstelemetrystatus = TELEMETRYSTATS_STATE_DISCONNECTED;
@@ -61,10 +62,13 @@ UAVTalk::UAVTalk() {
 	uav_current = 0;
 	uav_amp = 0;
 
+	mainwindow = parent;
+
 	// Make serialport and set the configs
 	serial = new QSerialPort(this);
-	//connect(serial, SIGNAL(readyRead()), this, SLOT(read()));
-	openSerialPort();
+	//openSerialPort();
+
+	connect(serial, SIGNAL(readyRead()), this, SLOT(read()));
 }
 
 UAVTalk::~UAVTalk() {
@@ -72,14 +76,12 @@ UAVTalk::~UAVTalk() {
 }
 
 // Read from the serial stream
-int UAVTalk::read(uavtalk_message_t& msg) {
+int UAVTalk::read() {
+	uavtalk_message_t msg;
 	static uint8_t crlf_count = 0;
-	//uavtalk_message_t msg;
 	uint8_t show_prio_info = 0;
 	bool telemetry_ok = false;
 
-	//cerr << serial->bytesAvailable() << endl;
-	//cerr << readByte();
 	// Grab data
 	serial->waitForReadyRead(50);
 	while (serial->bytesAvailable() > 0) {
@@ -120,12 +122,18 @@ int UAVTalk::read(uavtalk_message_t& msg) {
 					uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
 					uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
 					uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
-					//cerr << "Roll: " << uav_roll << endl;
+					mainwindow->updateAttitudeState(uav_roll, uav_pitch, uav_heading);
 					break;
 				case ACCELSTATE_OBJID:
-					//uav_roll = get_float(&msg, ACCELSTATE_OBJ_X);
-
-					//cerr << "Roll: " << uav_roll << endl;
+					uav_accel_x = get_float(&msg, ACCELSTATE_OBJ_X);
+					uav_accel_y = get_float(&msg, ACCELSTATE_OBJ_Y);
+					uav_accel_z = get_float(&msg, ACCELSTATE_OBJ_Z);
+					mainwindow->updateAccelState(uav_accel_x, uav_accel_y, uav_accel_z);
+					break;
+				case GYROSTATE_OBJID:
+					uav_gyro_x = get_float(&msg, GYROSTATE_OBJ_X);
+					uav_gyro_y = get_float(&msg, GYROSTATE_OBJ_Y);
+					uav_gyro_z = get_float(&msg, GYROSTATE_OBJ_Z);
 					break;
 				case FLIGHTSTATUS_OBJID:
 				case FLIGHTSTATUS_OBJID_001:
@@ -178,6 +186,8 @@ int UAVTalk::read(uavtalk_message_t& msg) {
 					uav_alt	= (int32_t) round(get_float(&msg, GPSPOSITION_OBJ_ALTITUDE) * 100.0f);
 #endif
 					uav_groundspeed	= (uint16_t)get_float(&msg, GPSPOSITION_OBJ_GROUNDSPEED);
+					mainwindow->updateGPSState(uav_lat, uav_lon, uav_satellites_visible,
+							uav_gpsheading, uav_alt, uav_groundspeed);
 					break;
 
 				case FLIGHTBATTERYSTATE_OBJID:
@@ -202,6 +212,8 @@ int UAVTalk::read(uavtalk_message_t& msg) {
 			if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
 				respond_object(&msg, UAVTALK_TYPE_ACK);
 			}
+			// Return a 1 if message updated any data
+
 			return 1;
 		}
 
@@ -271,35 +283,24 @@ int8_t UAVTalk::get_int8(uavtalk_message_t *msg, int pos) {
 // return an int16 from the ms
 int16_t UAVTalk::get_int16(uavtalk_message_t *msg, int pos) {
 	int16_t i;
-	//i = qFromLittleEndian<qint16>(msg->Data+pos);
-	memcpy(&i, msg->Data+pos, sizeof(int16_t));
-	//i = qToLittleEndian<qint16>(i);
+	memcpy(&i, msg->Data+pos+2, sizeof(int16_t));
 	return i;
 }
 
 int32_t UAVTalk::get_int32(uavtalk_message_t *msg, int pos) {
 	int32_t i;
-	i = qFromLittleEndian<qint32>(msg->Data+pos);
-	//memcpy(&i, msg->Data+pos, sizeof(int32_t));
+	memcpy(&i, msg->Data+pos+2, sizeof(int32_t));
 	return i;
 }
 
 // return an float from the ms
 float UAVTalk::get_float(uavtalk_message_t *msg, int pos) {
-	uint32_t temp;
 	float f;
-	cerr << "i1: " << (int) *(msg->Data+pos+3+2) << endl;
-	cerr << "i2: " << (int) *(msg->Data+pos+2+2) << endl;
-	cerr << "i3: " << (int) *(msg->Data+pos+1+2) << endl;
-	cerr << "i4: " << (int) *(msg->Data+pos+0+2) << endl;
-	temp = *(msg->Data+pos+2) | (*(msg->Data+pos+1+2) << 8) |
-		(*(msg->Data+pos+2+2) << 16) | (*(msg->Data+pos+3+2) << 24);
-	memcpy(&f, &temp, sizeof(float));
-	//temp = *(msg->Data+22);
-	//cerr << "TEMP: " << temp << endl;
-	//memcpy(&f, &temp, sizeof(float));
-	//f = qFromBigEndian<quint32>(msg->Data+pos);
-	//memcpy(&f, msg->Data+pos, sizeof(float));
+	// What the memcpy is doing
+	//uint32_t temp;
+	//temp = *(msg->Data+pos+2) | (*(msg->Data+pos+1+2) << 8) |
+	//	(*(msg->Data+pos+2+2) << 16) | (*(msg->Data+pos+3+2) << 24);
+	memcpy(&f, msg->Data+pos+2, sizeof(float));
 	return f;
 }
 

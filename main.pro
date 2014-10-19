@@ -1,6 +1,6 @@
 CONFIG += qt console
 QT += widgets serialport
 
-HEADERS += UAVTalk.h
-SOURCES += main.cpp UAVTalk.cpp
+HEADERS += UAVTalk.h mainwindow.h
+SOURCES += main.cpp UAVTalk.cpp mainwindow.cpp
 TARGET = Pillar_GCS

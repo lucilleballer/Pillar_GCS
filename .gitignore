@@ -6,3 +6,6 @@
 
 # Project file
 
+# Qt Files
+moc_*
+ui_*
