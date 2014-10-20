@@ -4,9 +4,9 @@
 #include <QPushButton>
 #include <QTimer>
 
-#include "UAVTalk.h"
+#include "inc/UAVTalk.h"
 
-#include "mainwindow.h"
+#include "inc/mainwindow.h"
 
 using namespace std;
 

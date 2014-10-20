@@ -13,7 +13,7 @@
 #include <QDialog>
 #include <QLabel>
 
-#include "UAVTalk.h"
+#include "inc/UAVTalk.h"
 
 //namespace Ui {
 //	class MainWindow;
@@ -37,6 +37,14 @@ class MainWindow : public QDialog
 				const int satellites, const int gpsheading,
 				const int alt, const int speed);
 
+		void updateFlightStatus(const int armed, const int mode);
+
+		void updateOPLinkStatus(const int rssi, const int quality,
+				const int state);
+
+		void updateBatteryState(const int bat, const int current,
+				const int amp);
+
 	private:
 		void initActionsConnections();
 
@@ -59,6 +67,17 @@ class MainWindow : public QDialog
 		QLabel* gpsheadingLabel;
 		QLabel* altLabel;
 		QLabel* groundspeedLabel;
+
+		QLabel* rssiLabel;
+		QLabel* linkqualityLabel;
+		QLabel* linkstateLabel;
+
+		QLabel* armLabel;
+		QLabel* flightmodeLabel;
+
+		QLabel* batLabel;
+		QLabel* currentLabel;
+		QLabel* ampLabel;
 
 		//Ui::MainWindow *ui;
 

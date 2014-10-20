@@ -97,8 +97,9 @@ class MainWindow;
 #define	GPSPOSITION_OBJ_STATUS				36
 #define	GPSPOSITION_OBJ_SATELLITES			37
 
-#define	OPLINKSTATUS_OBJ_RSSI				85
-#define	OPLINKSTATUS_OBJ_LINKQUALITY			86
+#define	OPLINKSTATUS_OBJ_RSSI				99
+#define	OPLINKSTATUS_OBJ_LINKQUALITY			100
+#define OPLINKSTATUS_OBJ_LINKSTATE				101
 
 #define MANUALCONTROLCOMMAND_OBJ_THROTTLE               0
 #define MANUALCONTROLCOMMAND_OBJ_ROLL                   4
@@ -217,8 +218,9 @@ class UAVTalk : public QObject
 		uint8_t readByte(void);
 
 		// These are made public for debugging
-		uint8_t uav_rssi;
+		int8_t uav_rssi;
 		uint8_t uav_linkquality;
+		uint8_t uav_linkstate;
 
 		uint8_t uav_failsafe;
 		uint8_t uav_arm;

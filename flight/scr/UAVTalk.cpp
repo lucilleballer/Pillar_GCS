@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cmath>
 #include <QtEndian>
-#include "UAVTalk.h"
-#include "mainwindow.h"
+#include "inc/UAVTalk.h"
+#include "inc/mainwindow.h"
 
 using namespace std;
 
@@ -143,7 +143,8 @@ int UAVTalk::read() {
 				case FLIGHTSTATUS_OBJID_005:
 					uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
 					//remap flight modes id to Ghettostation ones
-					switch (get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE)) {
+					uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
+					/*switch (get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE)) {
 						case 0: uav_flightmode = 0;  break;   //manual
 						case 1: uav_flightmode = 5;  break;   //stabilized 1
 						case 2: uav_flightmode = 6;  break;   //stabilized 2
@@ -154,9 +155,10 @@ int UAVTalk::read() {
 						case 7: uav_flightmode = 9;  break;   //pos hold
 						case 8: uav_flightmode = 13; break;   //RTH
 						case 9: uav_flightmode = 10; break;   //pathplanner (auto)
-					}
+					}*/
 					//if (msg.ObjID==FLIGHTSTATUS_OBJID_004) {
 					uav_failsafe = (get_int8(&msg, FLIGHTSTATUS_OBJ_CONTROLSOURCE) == 1) ? 1 : 0; // Taulabs only
+					mainwindow->updateFlightStatus(uav_arm, uav_flightmode);
 					//}
 					break;
 				case MANUALCONTROLCOMMAND_OBJID: // OP
@@ -194,6 +196,7 @@ int UAVTalk::read() {
 					uav_bat	= (int16_t) (1000.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_VOLTAGE));
 					uav_current	= (int16_t) (100.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CURRENT));
 					uav_amp	= (int16_t) get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CONSUMED_ENERGY);
+					mainwindow->updateBatteryState(uav_bat, uav_current, uav_amp);
 					break;
 
 				case BAROALTITUDE_OBJID:
@@ -205,7 +208,9 @@ int UAVTalk::read() {
 				case OPLINKSTATUS_OBJID:
 				case OPLINKSTATUS_OBJID_001:
 					uav_rssi = get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
-					uav_linkquality	= get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
+					uav_linkquality	= (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
+					uav_linkstate = (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKSTATE);
+					mainwindow->updateOPLinkStatus(uav_rssi, uav_linkquality, uav_linkstate);
 					break;
 
 			}
