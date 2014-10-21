@@ -1,12 +1,13 @@
-// main.c
+// main.cpp to run the autonomous flight controller on
+// the Narwhal for the Pillar CropCopter
 
 #define F_CPU 8000000UL
 
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-
-#include "MPU6050.hpp"
+#include "inc/UART.h"
+#include "inc/UAVTalk.h"
 
 // SERVO PORTC
 #define SERVO_PIN 3
@@ -14,19 +15,20 @@
 // LED0 PORTD
 #define LED0_PIN 5
 #define HEARTBEAT 6
+#define INPUT_PWM1 0
 
 uint16_t interval_counter = 0;
 
 int main()
 {
-	// Counter for the interval
-	uint16_t servo_angle = 105;
-	uint8_t pulse_active = 0;
-
 	// Set Servo output
 	DDRC |= (1 << SERVO_PIN);
 	// Set LED output
 	DDRD |= (1 << LED0_PIN) | (1 << HEARTBEAT);
+	// Set PWM inputs
+	DDRB &= ~(1 << INPUT_PWM1);
+	// Deactivate PWM input pull-up resistors
+	PORTB &= ~(1 << INPUT_PWM1);
 
 	// Setup 16-bit timer for CTC prescale = 1
 	TCCR1B |= (1 << CS10) | (1 << WGM12);
@@ -35,45 +37,34 @@ int main()
 
 	sei();	// Global interrupts on
 
-	// Init the IMU
-	MPU6050 imu;
-	imu.start();
+	// UAVTalk object to read the UAVObjects
+	UAVTalk uavtalk;
+
+	// PWM Variables for control signals
+	uint8_t pwm_inputs = 0;		// Indicates which inputs are counting
+	uint16_t pwm1_counter = 0;	// Counter for PWM1
 
 	while(1) 
 	{
-		imu.readData();
-
-		// Every 20ms
-		if (interval_counter >= 2000)
-		{
-			pulse_active |= (1 << 0);
-			PORTD ^= (1 << HEARTBEAT);
-			interval_counter = 0;
-
-			// Servo sweep test
-			if (pulse_active & (1 << 1)) {
-				servo_angle -= 4;
-				if (servo_angle < 100) pulse_active &= ~(1 << 1);
-			} else {
-				servo_angle += 4;
-				if (servo_angle > 260) pulse_active |= (1 << 1);
-			}
+		// Detect when the inputs go high
+		if (PINB & (1 << INPUT_PWM1)) {
+			// Start PWM counter
+			pwm_inputs |= (1 << INPUT_PWM1);
 		}
 
-		if (pulse_active & (1 << 0))
-		{
-			// Mid-point = 185
-			// Calculate the servo angle 
+		// Detect when the inputs go low
+		if (!(PINB & (1 << INPUT_PWM1))) {
+			// Stop the PWM counter
+			pwm_inputs &= ~(1 << INPUT_PWM1);
 
-
-			// Turn the servo signal on
-			PORTC |= (1 << SERVO_PIN);
-			if (interval_counter >= servo_angle)
-			{
-				PORTC &= ~(1 << SERVO_PIN);
-				pulse_active &= ~(1 << 0);
-			}
+			// Send the length to UART and reset counter
+			// Counter * 0.01ms = time in ms
+			UART::writeByte(pwm1_counter);
+			pwm1_counter = 0;
 		}
+
+		// Increment the PWM counters every 0.01ms
+		if (pwm_inputs & (1 << INPUT_PWM1)) ++pwm1_counter;
 	}
 
 	return 0;

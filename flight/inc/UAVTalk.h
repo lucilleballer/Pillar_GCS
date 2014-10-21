@@ -2,7 +2,7 @@
  * File:		UAVTalk.hpp
  * Author:		Alex Liao
  * Desc:		Implements UAVTalk telemetry communication with OpenPilot
- *				and the Pillar GCS
+ *				and the onboard autonomous flight controller
  * Etc:			Code based on code written by Joerg-D. Rothfuchs
  */
 
@@ -10,9 +10,6 @@
 #define UAVTALK_H
 
 #include <stdint.h>
-#include <QSerialPort>
-
-class MainWindow;
 
 #define UAVTALK_SYNC_VAL				0x3C
 #define UAVTALK_TYPE_MASK				0xF8
@@ -196,26 +193,19 @@ typedef enum {
 	TELEMETRYSTATS_STATE_CONNECTED
 } telemetrystats_state_t;
 
-class UAVTalk : public QObject
+class UAVTalk
 {
-	Q_OBJECT
-
 	public:
-		UAVTalk(MainWindow *mainwindow);
+		UAVTalk();
 
 		~UAVTalk();
 
 		// Read from the serial stream
-		//void read(void);
-		int read(uavtalk_message_t& msg);
+		int read(void);
+		//int read(uavtalk_message_t& msg);
 
 		// Get the state
 		int state(void);
-
-		void openSerialPort();
-
-		void write(uint8_t in);
-		uint8_t readByte(void);
 
 		// These are made public for debugging
 		int8_t uav_rssi;
@@ -240,6 +230,7 @@ class UAVTalk : public QObject
 		float uav_gyro_y;
 		float uav_gyro_z;
 
+		// GPS data
 		int32_t uav_lat;
 		int32_t uav_lon;
 		uint8_t uav_satellites_visible;
@@ -248,15 +239,12 @@ class UAVTalk : public QObject
 		int32_t uav_alt;
 		uint16_t uav_groundspeed;
 
+		// Battery and power data
 		uint16_t uav_bat;
 		uint16_t uav_current;
 		uint16_t uav_amp;
 
-		//uint8_t crc;
-
 	private:
-		void closeSerialPort();
-
 		// return an int8 from the ms
 		int8_t get_int8(uavtalk_message_t *msg, int pos);
 
@@ -271,14 +259,12 @@ class UAVTalk : public QObject
 		// send the uavtalk message msg
 		void send_msg(uavtalk_message_t *msg);
 
+		// Respond with an UAVObject
 		void respond_object(uavtalk_message_t *msg_to_respond, uint8_t type);
-
-		void send_gcstelemetrystats(void);
-
-		void set_telemetrystats_values(uint32_t ObjID);
 
 		uint8_t parse_char(uint8_t c, uavtalk_message_t *msg);
 
+		// TODO: Figure out if these are important
 		unsigned long last_gcstelemetrystats_send;
 		unsigned long last_flighttelemetry_connect;
 		uint8_t gcstelemetrystatus;
@@ -286,12 +272,6 @@ class UAVTalk : public QObject
 		uint8_t gcstelemetrystats_obj_len;
 		uint8_t gcstelemetrystats_obj_status;
 		uint8_t flighttelemetrystats_obj_status;
-
-		QSerialPort *serial;
-		MainWindow *mainwindow;
-
-	public slots:
-		int read();
 };
 
 #endif

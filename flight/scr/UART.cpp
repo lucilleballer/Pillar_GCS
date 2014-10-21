@@ -5,7 +5,7 @@
 // Date Created: 6/5/2014
 // Alectryon Technologies
 
-#include "comms/UART.hpp"
+#include "inc/UART.h"
 
 namespace UART
 {

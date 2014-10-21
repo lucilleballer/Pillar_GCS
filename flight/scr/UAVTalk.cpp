@@ -2,17 +2,16 @@
  * File:		UAVTalk.cpp
  * Author:		Alex Liao
  * Desc:		Implements UAVTalk telemetry communication with OpenPilot
- *				and the Pillar GCS
+ *				and the onboard autonomous flight controller
  * Etc:			Code based on code written by Joerg-D. Rothfuchs
  */
 
-#include <iostream>
-#include <cmath>
-#include <QtEndian>
 #include "inc/UAVTalk.h"
-#include "inc/mainwindow.h"
+#include "inc/UART.h"
+#include <string.h>
+#include <math.h>
 
-using namespace std;
+using namespace UART;
 
 // CRC lookup table
 const static uint8_t crc_table[] = {
@@ -34,7 +33,9 @@ const static uint8_t crc_table[] = {
 	0xde, 0xd9, 0xd0, 0xd7, 0xc2, 0xc5, 0xcc, 0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3
 };
 
-UAVTalk::UAVTalk(MainWindow* parent=0) {
+UAVTalk::UAVTalk() {
+	initUART(57600, true);
+
 	last_gcstelemetrystats_send = 0;
 	last_flighttelemetry_connect = 0;
 	gcstelemetrystatus = TELEMETRYSTATS_STATE_DISCONNECTED;
@@ -61,224 +62,117 @@ UAVTalk::UAVTalk(MainWindow* parent=0) {
 	uav_bat = 0;
 	uav_current = 0;
 	uav_amp = 0;
-
-	mainwindow = parent;
-
-	// Make serialport and set the configs
-	serial = new QSerialPort(this);
-	//openSerialPort();
-
-	connect(serial, SIGNAL(readyRead()), this, SLOT(read()));
 }
 
 UAVTalk::~UAVTalk() {
-	closeSerialPort();
 }
 
 // Read from the serial stream
 int UAVTalk::read() {
 	uavtalk_message_t msg;
-	static uint8_t crlf_count = 0;
-	uint8_t show_prio_info = 0;
-	bool telemetry_ok = false;
+	//static uint8_t crlf_count = 0;
+	//uint8_t show_prio_info = 0;
 
-	// Grab data
-	serial->waitForReadyRead(50);
-	while (serial->bytesAvailable() > 0) {
-		// read in one byte
-		uint8_t c = (uint8_t) serial->read(1).at(0);
-		//uint8_t c = readByte();
-		//cerr << c;
-
-		// parse data to msg
-		if (parse_char(c, &msg)) {
-			//telemetry_ok = true;
-			//lastpacketreceived = millis();
-			// consume msg
-			//cerr << msg.ObjID << endl;
-			switch (msg.ObjID) {
-				case FLIGHTTELEMETRYSTATS_OBJID:
-				case FLIGHTTELEMETRYSTATS_OBJID_001:
-					set_telemetrystats_values(msg.ObjID);
-					switch (msg.Data[flighttelemetrystats_obj_status]) {
-						case TELEMETRYSTATS_STATE_DISCONNECTED:
-							gcstelemetrystatus = TELEMETRYSTATS_STATE_HANDSHAKEREQ;
-							//uavtalk_send_gcstelemetrystats();
-							break;
-						case TELEMETRYSTATS_STATE_HANDSHAKEACK:
-							gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
-							//uavtalk_send_gcstelemetrystats();
-							break;
-						case TELEMETRYSTATS_STATE_CONNECTED:
-							gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
-							//last_flighttelemetry_connect = millis();
-							break;
-					}
-					break;
-				case ATTITUDEACTUAL_OBJID:
-				case ATTITUDESTATE_OBJID:
-					//last_flighttelemetry_connect = millis();
-					show_prio_info = 1;
-					uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
-					uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
-					uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
-					mainwindow->updateAttitudeState(uav_roll, uav_pitch, uav_heading);
-					break;
-				case ACCELSTATE_OBJID:
-					uav_accel_x = get_float(&msg, ACCELSTATE_OBJ_X);
-					uav_accel_y = get_float(&msg, ACCELSTATE_OBJ_Y);
-					uav_accel_z = get_float(&msg, ACCELSTATE_OBJ_Z);
-					mainwindow->updateAccelState(uav_accel_x, uav_accel_y, uav_accel_z);
-					break;
-				case GYROSTATE_OBJID:
-					uav_gyro_x = get_float(&msg, GYROSTATE_OBJ_X);
-					uav_gyro_y = get_float(&msg, GYROSTATE_OBJ_Y);
-					uav_gyro_z = get_float(&msg, GYROSTATE_OBJ_Z);
-					break;
-				case FLIGHTSTATUS_OBJID:
-				case FLIGHTSTATUS_OBJID_001:
-				case FLIGHTSTATUS_OBJID_002:
-				case FLIGHTSTATUS_OBJID_003:
-				case FLIGHTSTATUS_OBJID_004:
-				case FLIGHTSTATUS_OBJID_005:
-					uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
-					//remap flight modes id to Ghettostation ones
-					uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
-					/*switch (get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE)) {
-						case 0: uav_flightmode = 0;  break;   //manual
-						case 1: uav_flightmode = 5;  break;   //stabilized 1
-						case 2: uav_flightmode = 6;  break;   //stabilized 2
-						case 3: uav_flightmode = 7;  break;   //stabilized 3
-						case 4: uav_flightmode = 16; break;   //autotune (unknown)
-						case 5: uav_flightmode = 8;  break;   //altitude hold
-						case 6: uav_flightmode = 16; break;   //velocity control (unknown)
-						case 7: uav_flightmode = 9;  break;   //pos hold
-						case 8: uav_flightmode = 13; break;   //RTH
-						case 9: uav_flightmode = 10; break;   //pathplanner (auto)
-					}*/
-					//if (msg.ObjID==FLIGHTSTATUS_OBJID_004) {
-					uav_failsafe = (get_int8(&msg, FLIGHTSTATUS_OBJ_CONTROLSOURCE) == 1) ? 1 : 0; // Taulabs only
-					mainwindow->updateFlightStatus(uav_arm, uav_flightmode);
-					//}
-					break;
-				case MANUALCONTROLCOMMAND_OBJID: // OP
-					// uav_chan5_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_CHANNEL_4);
-					// uav_chan6_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_CHANNEL_6);
-					// uav_chan7_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_CHANNEL_7);
-					// uav_chan8_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_CHANNEL_8);
-					break;
-				case MANUALCONTROLCOMMAND_OBJID_001: //Taulabs
-					uav_rssi = (uint8_t) get_int16( &msg, MANUALCONTROLCOMMAND_OBJ_001_RSSI);
-					if ( uav_rssi > 100 ) uav_rssi = 0; // rssi > 100 means it entered taulabs failsafe mode
-					// uav_chan5_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_4);
-					// uav_chan6_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_6);
-					// uav_chan7_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_7);
-					// uav_chan8_raw = uavtalk_get_int16(&msg, MANUALCONTROLCOMMAND_OBJ_001_CHANNEL_8);
-
-					break;
-				case GPSPOSITION_OBJID:
-				case GPSPOSITION_OBJID_001:
-				case GPSPOSITIONSENSOR_OBJID:
-					uav_lat	= get_int32(&msg, GPSPOSITION_OBJ_LAT);
-					uav_lon = get_int32(&msg, GPSPOSITION_OBJ_LON);
-					uav_satellites_visible	= (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_SATELLITES);
-					uav_fix_type = (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_STATUS);
-					uav_gpsheading = (int16_t) get_float(&msg, GPSPOSITION_OBJ_HEADING);
+	// Grab the data
+	uint8_t c = readByte();
+	
+	// parse data to msg
+	if (parse_char(c, &msg)) {
+		// consume msg
+		switch (msg.ObjID) {
+			case FLIGHTTELEMETRYSTATS_OBJID:
+			case FLIGHTTELEMETRYSTATS_OBJID_001:
+				switch (msg.Data[flighttelemetrystats_obj_status]) {
+					case TELEMETRYSTATS_STATE_DISCONNECTED:
+						gcstelemetrystatus = TELEMETRYSTATS_STATE_HANDSHAKEREQ;
+						break;
+					case TELEMETRYSTATS_STATE_HANDSHAKEACK:
+						gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
+						break;
+					case TELEMETRYSTATS_STATE_CONNECTED:
+						gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
+						break;
+				}
+				break;
+			case ATTITUDEACTUAL_OBJID:
+			case ATTITUDESTATE_OBJID:
+				//show_prio_info = 1;
+				uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
+				uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
+				uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
+				break;
+			case ACCELSTATE_OBJID:
+				uav_accel_x = get_float(&msg, ACCELSTATE_OBJ_X);
+				uav_accel_y = get_float(&msg, ACCELSTATE_OBJ_Y);
+				uav_accel_z = get_float(&msg, ACCELSTATE_OBJ_Z);
+				break;
+			case GYROSTATE_OBJID:
+				uav_gyro_x = get_float(&msg, GYROSTATE_OBJ_X);
+				uav_gyro_y = get_float(&msg, GYROSTATE_OBJ_Y);
+				uav_gyro_z = get_float(&msg, GYROSTATE_OBJ_Z);
+				break;
+			case FLIGHTSTATUS_OBJID:
+			case FLIGHTSTATUS_OBJID_001:
+			case FLIGHTSTATUS_OBJID_002:
+			case FLIGHTSTATUS_OBJID_003:
+			case FLIGHTSTATUS_OBJID_004:
+			case FLIGHTSTATUS_OBJID_005:
+				uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
+				uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
+				break;
+			case MANUALCONTROLCOMMAND_OBJID: // OP
+				break;
+			case MANUALCONTROLCOMMAND_OBJID_001: //Taulabs
+				uav_rssi = (uint8_t) get_int16( &msg, MANUALCONTROLCOMMAND_OBJ_001_RSSI);
+				break;
+			case GPSPOSITION_OBJID:
+			case GPSPOSITION_OBJID_001:
+			case GPSPOSITIONSENSOR_OBJID:
+				uav_lat	= get_int32(&msg, GPSPOSITION_OBJ_LAT);
+				uav_lon = get_int32(&msg, GPSPOSITION_OBJ_LON);
+				uav_satellites_visible	= (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_SATELLITES);
+				uav_fix_type = (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_STATUS);
+				uav_gpsheading = (int16_t) get_float(&msg, GPSPOSITION_OBJ_HEADING);
 #ifndef BARO_ALT
-					uav_alt	= (int32_t) round(get_float(&msg, GPSPOSITION_OBJ_ALTITUDE) * 100.0f);
+				uav_alt	= (int32_t) round(get_float(&msg, GPSPOSITION_OBJ_ALTITUDE) * 100.0f);
 #endif
-					uav_groundspeed	= (uint16_t)get_float(&msg, GPSPOSITION_OBJ_GROUNDSPEED);
-					mainwindow->updateGPSState(uav_lat, uav_lon, uav_satellites_visible,
-							uav_gpsheading, uav_alt, uav_groundspeed);
-					break;
+				uav_groundspeed	= (uint16_t)get_float(&msg, GPSPOSITION_OBJ_GROUNDSPEED);
+				break;
 
-				case FLIGHTBATTERYSTATE_OBJID:
-					uav_bat	= (int16_t) (1000.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_VOLTAGE));
-					uav_current	= (int16_t) (100.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CURRENT));
-					uav_amp	= (int16_t) get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CONSUMED_ENERGY);
-					mainwindow->updateBatteryState(uav_bat, uav_current, uav_amp);
-					break;
+			case FLIGHTBATTERYSTATE_OBJID:
+				uav_bat	= (int16_t) (1000.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_VOLTAGE));
+				uav_current	= (int16_t) (100.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CURRENT));
+				uav_amp	= (int16_t) get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CONSUMED_ENERGY);
+				break;
 
-				case BAROALTITUDE_OBJID:
-				case BAROSENSOR_OBJID:
+			case BAROALTITUDE_OBJID:
+			case BAROSENSOR_OBJID:
 #ifdef BARO_ALT
-					uav_alt	= (int32_t) round (get_float(&msg, BAROALTITUDE_OBJ_ALTITUDE) * 100.0f);
+				uav_alt	= (int32_t) round (get_float(&msg, BAROALTITUDE_OBJ_ALTITUDE) * 100.0f);
 #endif
-					break;
-				case OPLINKSTATUS_OBJID:
-				case OPLINKSTATUS_OBJID_001:
-					uav_rssi = get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
-					uav_linkquality	= (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
-					uav_linkstate = (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKSTATE);
-					mainwindow->updateOPLinkStatus(uav_rssi, uav_linkquality, uav_linkstate);
-					break;
+				break;
+			case OPLINKSTATUS_OBJID:
+			case OPLINKSTATUS_OBJID_001:
+				uav_rssi = get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
+				uav_linkquality	= (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
+				uav_linkstate = (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKSTATE);
+				break;
 
-			}
-			if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
-				respond_object(&msg, UAVTALK_TYPE_ACK);
-			}
-			// Return a 1 if message updated any data
-
-			return 1;
 		}
+		if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
+			respond_object(&msg, UAVTALK_TYPE_ACK);
+		}
+		// Return a 1 if message updated any data
 
-		//delayMicroseconds(190);  // wait at least 1 byte
+		return 1;
 	}
-
-	// check connect timeout
-	/*if (last_flighttelemetry_connect + FLIGHTTELEMETRYSTATS_CONNECT_TIMEOUT < millis()) {
-		gcstelemetrystatus = TELEMETRYSTATS_STATE_DISCONNECTED;
-		show_prio_info = 1;
-	}*/
-
-	// periodically send gcstelemetrystats
-	/*if (last_gcstelemetrystats_send + GCSTELEMETRYSTATS_SEND_PERIOD < millis()) {
-		uavtalk_send_gcstelemetrystats();
-	}*/
-
-	//return show_prio_info;
-	//return msg;
 	return 0;
 }
 
-uint8_t UAVTalk::readByte(void) {
-	serial->waitForReadyRead(5);
-	QByteArray data = serial->read(1);
-	return data.at(0);
-}
-
-void UAVTalk::write(uint8_t in) {
-	char c = in;
-	serial->write(&c);
-}
 
 // Get the state
 int UAVTalk::state(void) {
 	return 0;
-}
-
-void UAVTalk::openSerialPort() {
-	serial->setPortName("/dev/ttyUSB0");
-	serial->setBaudRate(QSerialPort::Baud57600);
-	serial->setDataBits(QSerialPort::Data8);
-	serial->setParity(QSerialPort::NoParity);
-	serial->setStopBits(QSerialPort::OneStop);
-	serial->setFlowControl(QSerialPort::NoFlowControl);
-
-	// open the serial port
-	if (serial->open(QIODevice::ReadWrite)) {
-		cout << "Successfully opened serial port\n";
-		cout << serial->portName().toStdString() << endl;
-	} else {
-		cout << "Error opening serial port\n";
-		cout << serial->errorString().toStdString() << endl;
-	}
-
-}
-
-void UAVTalk::closeSerialPort() {
-	cout << "Closing serial port\n";
-	serial->close();
 }
 
 int8_t UAVTalk::get_int8(uavtalk_message_t *msg, int pos) {
@@ -316,39 +210,39 @@ void UAVTalk::send_msg(uavtalk_message_t *msg) {
 	char c;
 
 	c = (char) (msg->Sync);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[0];
 	c = (char) (msg->MsgType);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) (msg->Length & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) ((msg->Length >> 8) & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) (msg->ObjID & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) ((msg->ObjID >> 8) & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) ((msg->ObjID >> 16) & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	c = (char) ((msg->ObjID >> 24) & 0xff);
-	serial->write(&c);
+	writeByte(c);
 	msg->Crc = crc_table[msg->Crc ^ c];
 	if (msg->Length > 8) {
 		d = msg->Data;
 		for (i=0; i<msg->Length-8; i++) {
 			c = *d++;
-			serial->write(&c);
+			writeByte(c);
 			msg->Crc = crc_table[msg->Crc ^ c];
 		}
 	}
 	c = msg->Crc;
-	serial->write(&c);
+	writeByte(c);
 }
 
 void UAVTalk::respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
@@ -360,14 +254,6 @@ void UAVTalk::respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
 	msg.ObjID	= msg_to_respond->ObjID;
 
 	send_msg(&msg);
-}
-
-void UAVTalk::send_gcstelemetrystats(void) {
-
-}
-
-void UAVTalk::set_telemetrystats_values(uint32_t ObjID) {
-
 }
 
 uint8_t UAVTalk::parse_char(uint8_t c, uavtalk_message_t *msg) {

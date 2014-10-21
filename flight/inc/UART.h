@@ -14,7 +14,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdint.h>
-#include "common/utils.hpp"
 
 /**
 	Namespace for UART related functions
