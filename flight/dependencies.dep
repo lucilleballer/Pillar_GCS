@@ -1,3 +1,3 @@
-obj/main.o: main.cpp inc/UART.h
+obj/main.o: main.cpp inc/UART.h inc/UAVTalk.h
 obj/UART.o: scr/UART.cpp inc/UART.h
 obj/UAVTalk.o: scr/UAVTalk.cpp inc/UAVTalk.h inc/UART.h

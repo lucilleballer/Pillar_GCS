@@ -73,98 +73,104 @@ int UAVTalk::read() {
 	//static uint8_t crlf_count = 0;
 	//uint8_t show_prio_info = 0;
 
+	uint8_t c;
+	while(1) {
 	// Grab the data
-	uint8_t c = readByte();
+		while (!UART::UART_newData);
+		c = UART::UART_data;
+		UART::UART_newData = false;
+		//UART::writeByte(c);
 	
-	// parse data to msg
-	if (parse_char(c, &msg)) {
-		// consume msg
-		switch (msg.ObjID) {
-			case FLIGHTTELEMETRYSTATS_OBJID:
-			case FLIGHTTELEMETRYSTATS_OBJID_001:
-				switch (msg.Data[flighttelemetrystats_obj_status]) {
-					case TELEMETRYSTATS_STATE_DISCONNECTED:
-						gcstelemetrystatus = TELEMETRYSTATS_STATE_HANDSHAKEREQ;
-						break;
-					case TELEMETRYSTATS_STATE_HANDSHAKEACK:
-						gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
-						break;
-					case TELEMETRYSTATS_STATE_CONNECTED:
-						gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
-						break;
-				}
-				break;
-			case ATTITUDEACTUAL_OBJID:
-			case ATTITUDESTATE_OBJID:
-				//show_prio_info = 1;
-				uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
-				uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
-				uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
-				break;
-			case ACCELSTATE_OBJID:
-				uav_accel_x = get_float(&msg, ACCELSTATE_OBJ_X);
-				uav_accel_y = get_float(&msg, ACCELSTATE_OBJ_Y);
-				uav_accel_z = get_float(&msg, ACCELSTATE_OBJ_Z);
-				break;
-			case GYROSTATE_OBJID:
-				uav_gyro_x = get_float(&msg, GYROSTATE_OBJ_X);
-				uav_gyro_y = get_float(&msg, GYROSTATE_OBJ_Y);
-				uav_gyro_z = get_float(&msg, GYROSTATE_OBJ_Z);
-				break;
-			case FLIGHTSTATUS_OBJID:
-			case FLIGHTSTATUS_OBJID_001:
-			case FLIGHTSTATUS_OBJID_002:
-			case FLIGHTSTATUS_OBJID_003:
-			case FLIGHTSTATUS_OBJID_004:
-			case FLIGHTSTATUS_OBJID_005:
-				uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
-				uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
-				break;
-			case MANUALCONTROLCOMMAND_OBJID: // OP
-				break;
-			case MANUALCONTROLCOMMAND_OBJID_001: //Taulabs
-				uav_rssi = (uint8_t) get_int16( &msg, MANUALCONTROLCOMMAND_OBJ_001_RSSI);
-				break;
-			case GPSPOSITION_OBJID:
-			case GPSPOSITION_OBJID_001:
-			case GPSPOSITIONSENSOR_OBJID:
-				uav_lat	= get_int32(&msg, GPSPOSITION_OBJ_LAT);
-				uav_lon = get_int32(&msg, GPSPOSITION_OBJ_LON);
-				uav_satellites_visible	= (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_SATELLITES);
-				uav_fix_type = (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_STATUS);
-				uav_gpsheading = (int16_t) get_float(&msg, GPSPOSITION_OBJ_HEADING);
+		// parse data to msg
+		if (parse_char(c, &msg)) {
+			// consume msg
+			switch (msg.ObjID) {
+				case FLIGHTTELEMETRYSTATS_OBJID:
+				case FLIGHTTELEMETRYSTATS_OBJID_001:
+					switch (msg.Data[flighttelemetrystats_obj_status]) {
+						case TELEMETRYSTATS_STATE_DISCONNECTED:
+							gcstelemetrystatus = TELEMETRYSTATS_STATE_HANDSHAKEREQ;
+							break;
+						case TELEMETRYSTATS_STATE_HANDSHAKEACK:
+							gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
+							break;
+						case TELEMETRYSTATS_STATE_CONNECTED:
+							gcstelemetrystatus = TELEMETRYSTATS_STATE_CONNECTED;
+							break;
+					}
+					break;
+				case ATTITUDEACTUAL_OBJID:
+				case ATTITUDESTATE_OBJID:
+					//show_prio_info = 1;
+					uav_roll =  get_float(&msg, ATTITUDEACTUAL_OBJ_ROLL);
+					uav_pitch = get_float(&msg, ATTITUDEACTUAL_OBJ_PITCH);
+					uav_heading	= get_float(&msg, ATTITUDEACTUAL_OBJ_YAW);
+					break;
+				case ACCELSTATE_OBJID:
+					uav_accel_x = get_float(&msg, ACCELSTATE_OBJ_X);
+					uav_accel_y = get_float(&msg, ACCELSTATE_OBJ_Y);
+					uav_accel_z = get_float(&msg, ACCELSTATE_OBJ_Z);
+					break;
+				case GYROSTATE_OBJID:
+					uav_gyro_x = get_float(&msg, GYROSTATE_OBJ_X);
+					uav_gyro_y = get_float(&msg, GYROSTATE_OBJ_Y);
+					uav_gyro_z = get_float(&msg, GYROSTATE_OBJ_Z);
+					break;
+				case FLIGHTSTATUS_OBJID:
+				case FLIGHTSTATUS_OBJID_001:
+				case FLIGHTSTATUS_OBJID_002:
+				case FLIGHTSTATUS_OBJID_003:
+				case FLIGHTSTATUS_OBJID_004:
+				case FLIGHTSTATUS_OBJID_005:
+					uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
+					uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
+					break;
+				case MANUALCONTROLCOMMAND_OBJID: // OP
+					break;
+				case MANUALCONTROLCOMMAND_OBJID_001: //Taulabs
+					uav_rssi = (uint8_t) get_int16( &msg, MANUALCONTROLCOMMAND_OBJ_001_RSSI);
+					break;
+				case GPSPOSITION_OBJID:
+				case GPSPOSITION_OBJID_001:
+				case GPSPOSITIONSENSOR_OBJID:
+					uav_lat	= get_int32(&msg, GPSPOSITION_OBJ_LAT);
+					uav_lon = get_int32(&msg, GPSPOSITION_OBJ_LON);
+					uav_satellites_visible	= (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_SATELLITES);
+					uav_fix_type = (uint8_t) get_int8(&msg, GPSPOSITION_OBJ_STATUS);
+					uav_gpsheading = (int16_t) get_float(&msg, GPSPOSITION_OBJ_HEADING);
 #ifndef BARO_ALT
-				uav_alt	= (int32_t) round(get_float(&msg, GPSPOSITION_OBJ_ALTITUDE) * 100.0f);
+					uav_alt	= (int32_t) round(get_float(&msg, GPSPOSITION_OBJ_ALTITUDE) * 100.0f);
 #endif
-				uav_groundspeed	= (uint16_t)get_float(&msg, GPSPOSITION_OBJ_GROUNDSPEED);
-				break;
+					uav_groundspeed	= (uint16_t)get_float(&msg, GPSPOSITION_OBJ_GROUNDSPEED);
+					break;
 
-			case FLIGHTBATTERYSTATE_OBJID:
-				uav_bat	= (int16_t) (1000.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_VOLTAGE));
-				uav_current	= (int16_t) (100.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CURRENT));
-				uav_amp	= (int16_t) get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CONSUMED_ENERGY);
-				break;
+				case FLIGHTBATTERYSTATE_OBJID:
+					uav_bat	= (int16_t) (1000.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_VOLTAGE));
+					uav_current	= (int16_t) (100.0 * get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CURRENT));
+					uav_amp	= (int16_t) get_float(&msg, FLIGHTBATTERYSTATE_OBJ_CONSUMED_ENERGY);
+					break;
 
-			case BAROALTITUDE_OBJID:
-			case BAROSENSOR_OBJID:
+				case BAROALTITUDE_OBJID:
+				case BAROSENSOR_OBJID:
 #ifdef BARO_ALT
-				uav_alt	= (int32_t) round (get_float(&msg, BAROALTITUDE_OBJ_ALTITUDE) * 100.0f);
+					uav_alt	= (int32_t) round (get_float(&msg, BAROALTITUDE_OBJ_ALTITUDE) * 100.0f);
 #endif
-				break;
-			case OPLINKSTATUS_OBJID:
-			case OPLINKSTATUS_OBJID_001:
-				uav_rssi = get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
-				uav_linkquality	= (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
-				uav_linkstate = (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKSTATE);
-				break;
+					break;
+				case OPLINKSTATUS_OBJID:
+				case OPLINKSTATUS_OBJID_001:
+					uav_rssi = get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
+					uav_linkquality	= (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
+					uav_linkstate = (uint8_t) get_int8(&msg, OPLINKSTATUS_OBJ_LINKSTATE);
+					break;
 
-		}
-		if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
-			respond_object(&msg, UAVTALK_TYPE_ACK);
-		}
-		// Return a 1 if message updated any data
+			}
+			if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
+				respond_object(&msg, UAVTALK_TYPE_ACK);
+			}
+			// Return a 1 if message updated any data
 
-		return 1;
+			return 1;
+		}
 	}
 	return 0;
 }

@@ -6,8 +6,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <string.h>
 #include "inc/UART.h"
-//#include "inc/UAVTalk.h"
+#include "inc/UAVTalk.h"
 
 // SERVO PORTC
 #define SERVO_PIN 3
@@ -42,6 +43,8 @@ volatile uint8_t pwm_input_pins[PWM_CHANNELS] = { INPUT_PWM };
 // Pin history for the input change interrupt
 volatile uint8_t portbhistory = 0xFF;
 
+volatile bool test = 0;
+
 int main()
 {
 	uint8_t i;
@@ -58,7 +61,7 @@ int main()
 		PORTB |= (1 << pwm_input_pins[i]);
 	}
 	DDRC = 0xFF;
-
+	DDRD = 0xFE;
 
 	// Setup 16-bit timer for CTC prescale = 1
 	// TODO: OCR1A > OCR1B
@@ -79,10 +82,11 @@ int main()
 			| (1 << PCINT3) | (1 << PCINT4);
 	PCICR |= (1 << PCIE0);
 
-	sei();	// Global interrupts on
+	//sei();	// Global interrupts on
 
 	// UAVTalk object to read the UAVObjects
-	//UAVTalk uavtalk;	// This also calls initUART()
+	UAVTalk uavtalk;	// This also calls initUART()
+	UART::initUART(38400, true);
 
 	// Initialize variables
 	// Initialize the desired PWM for testing
@@ -97,9 +101,22 @@ int main()
 		pwm_desired_sums[i] = sum;
 	}
 
+	uint8_t data = 0;
 	while(1) 
-	{
-
+	{	
+		// NOTE: UART requires a common ground, even through FTDI
+		//while (!uavtalk.read());
+		if (test) {
+		if(uavtalk.read()) {
+			uint32_t temp; 
+			memcpy(&temp, &uavtalk.uav_roll, sizeof(float));
+			UART::writeByte(temp >> 24);
+			UART::writeByte(temp >> 16);
+			UART::writeByte(temp >> 8);
+			UART::writeByte(temp);
+		}
+		test = 0;
+		}
 	}
 
 	return 0;
@@ -118,6 +135,7 @@ ISR(TIMER1_COMPA_vect)
 		sum += pwm_desired[i];
 		pwm_desired_sums[i] = sum;
 	}
+	test = 1;
 }
 
 ISR(TIMER1_COMPB_vect)

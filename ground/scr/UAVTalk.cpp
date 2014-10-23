@@ -83,12 +83,26 @@ int UAVTalk::read() {
 	bool telemetry_ok = false;
 
 	// Grab data
-	serial->waitForReadyRead(50);
+	uint32_t temp = 0;
+	float f;
+	uint8_t c = readByte();
+	temp |= c << 24;
+	c = readByte();
+	temp |= c << 16;
+	c = readByte();
+	temp |= c << 8;
+	c = serial->read(1).at(0);
+	temp |= c;
+	memcpy(&f, &temp, sizeof(float));
+	//cout << f << endl;
+	serial->clear(QSerialPort::Input);
+	mainwindow->updateAttitudeState(f, 0, 0);
+	/*serial->waitForReadyRead(50);
 	while (serial->bytesAvailable() > 0) {
 		// read in one byte
 		uint8_t c = (uint8_t) serial->read(1).at(0);
 		//uint8_t c = readByte();
-		//cerr << c;
+		//cerr << (int) c << endl;
 
 		// parse data to msg
 		if (parse_char(c, &msg)) {
@@ -144,7 +158,7 @@ int UAVTalk::read() {
 					uav_arm = get_int8(&msg, FLIGHTSTATUS_OBJ_ARMED);
 					//remap flight modes id to Ghettostation ones
 					uav_flightmode = get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE);
-					/*switch (get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE)) {
+					switch (get_int8(&msg, FLIGHTSTATUS_OBJ_FLIGHTMODE)) {
 						case 0: uav_flightmode = 0;  break;   //manual
 						case 1: uav_flightmode = 5;  break;   //stabilized 1
 						case 2: uav_flightmode = 6;  break;   //stabilized 2
@@ -155,7 +169,7 @@ int UAVTalk::read() {
 						case 7: uav_flightmode = 9;  break;   //pos hold
 						case 8: uav_flightmode = 13; break;   //RTH
 						case 9: uav_flightmode = 10; break;   //pathplanner (auto)
-					}*/
+					}
 					//if (msg.ObjID==FLIGHTSTATUS_OBJID_004) {
 					uav_failsafe = (get_int8(&msg, FLIGHTSTATUS_OBJ_CONTROLSOURCE) == 1) ? 1 : 0; // Taulabs only
 					mainwindow->updateFlightStatus(uav_arm, uav_flightmode);
@@ -223,16 +237,16 @@ int UAVTalk::read() {
 		}
 
 		//delayMicroseconds(190);  // wait at least 1 byte
-	}
+	}*/
 
 	// check connect timeout
 	/*if (last_flighttelemetry_connect + FLIGHTTELEMETRYSTATS_CONNECT_TIMEOUT < millis()) {
 		gcstelemetrystatus = TELEMETRYSTATS_STATE_DISCONNECTED;
 		show_prio_info = 1;
-	}*/
+	}
 
 	// periodically send gcstelemetrystats
-	/*if (last_gcstelemetrystats_send + GCSTELEMETRYSTATS_SEND_PERIOD < millis()) {
+	if (last_gcstelemetrystats_send + GCSTELEMETRYSTATS_SEND_PERIOD < millis()) {
 		uavtalk_send_gcstelemetrystats();
 	}*/
 
@@ -259,7 +273,7 @@ int UAVTalk::state(void) {
 
 void UAVTalk::openSerialPort() {
 	serial->setPortName("/dev/ttyUSB0");
-	serial->setBaudRate(QSerialPort::Baud57600);
+	serial->setBaudRate(QSerialPort::Baud38400);
 	serial->setDataBits(QSerialPort::Data8);
 	serial->setParity(QSerialPort::NoParity);
 	serial->setStopBits(QSerialPort::OneStop);

@@ -1,5 +1,6 @@
 # Vim swap files
 *.swp
+*.swo
 
 # C Obj Files
 *.o
