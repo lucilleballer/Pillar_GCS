@@ -30,13 +30,11 @@ volatile uint32_t pwm_output_counter = 0;
 
 // PWM Variables for control signals
 volatile uint8_t pwm_inputs = 0;		// Indicates which inputs are counting
-volatile uint16_t pwm1_input_counter = 0;	// Counter for the input PWM1
 volatile uint8_t pwm_outputs = 0;	// Indicates which outputs are on
-volatile uint32_t pwm1_output_counter = 0;	// Counter for the output PWM1
 
 volatile uint16_t pwm_input_counters[PWM_CHANNELS];
-uint16_t pwm_desired[PWM_CHANNELS];
-uint16_t pwm_desired_sums[PWM_CHANNELS];
+volatile uint16_t pwm_desired[PWM_CHANNELS];
+volatile uint16_t pwm_desired_sums[PWM_CHANNELS];
 uint8_t pwm_output_pins[PWM_CHANNELS] = { OUTPUT_PWM };
 volatile uint8_t pwm_input_pins[PWM_CHANNELS] = { INPUT_PWM };
 
@@ -72,17 +70,18 @@ int main()
 
 	// Setup 8-bit timer for CTC prescale = 1
 	TCCR0A |= (1 << WGM01);
-	TCCR0B |= (1 << CS00);	
 	OCR0A = 160;	// Every 5us
+	TCCR0B |= (1 << CS00);	
 	TIMSK0 = (1 << OCIE0A);
 
 	// Setup Pin interrupts for the PWM inputs pins
 	// TODO: Make this more flexible (Take in the MACROS)
 	PCMSK0 |= (1 << PCINT0) | (1 << PCINT1) | (1 << PCINT2) 
 			| (1 << PCINT3) | (1 << PCINT4);
+	//PCMSK0 |= (1 << PCINT0);
 	PCICR |= (1 << PCIE0);
 
-	//sei();	// Global interrupts on
+	sei();	// Global interrupts on
 
 	// UAVTalk object to read the UAVObjects
 	UAVTalk uavtalk;	// This also calls initUART()
@@ -106,17 +105,17 @@ int main()
 	{	
 		// NOTE: UART requires a common ground, even through FTDI
 		//while (!uavtalk.read());
-		if (test) {
-		if(uavtalk.read()) {
-			uint32_t temp; 
-			memcpy(&temp, &uavtalk.uav_roll, sizeof(float));
-			UART::writeByte(temp >> 24);
-			UART::writeByte(temp >> 16);
-			UART::writeByte(temp >> 8);
-			UART::writeByte(temp);
-		}
-		test = 0;
-		}
+		/*if (test) {
+			if(uavtalk.read()) {
+				uint32_t temp; 
+				memcpy(&temp, &uavtalk.uav_roll, sizeof(float));
+				UART::writeByte(temp >> 24);
+				UART::writeByte(temp >> 16);
+				UART::writeByte(temp >> 8);
+				UART::writeByte(temp);
+			}
+			test = 0;
+		}*/
 	}
 
 	return 0;
@@ -135,7 +134,7 @@ ISR(TIMER1_COMPA_vect)
 		sum += pwm_desired[i];
 		pwm_desired_sums[i] = sum;
 	}
-	test = 1;
+	//test = 1;
 }
 
 ISR(TIMER1_COMPB_vect)
@@ -156,18 +155,17 @@ ISR(TIMER1_COMPB_vect)
 ISR(TIMER0_COMPA_vect)
 {
 	// Loops seem to suck in interrupts
-	if (pwm_inputs & (1 << 0))
-		++pwm1_input_counter;
-	if (pwm_inputs & (1 << 0))
+	if (pwm_inputs & (1 << 0)) {
 		++pwm_input_counters[0];
-	if (pwm_inputs & (1 << 1))
+	}
+	/*if (pwm_inputs & (1 << 1))
 		++pwm_input_counters[1];
 	if (pwm_inputs & (1 << 2))
 		++pwm_input_counters[2];
 	if (pwm_inputs & (1 << 3))
 		++pwm_input_counters[3];
 	if (pwm_inputs & (1 << 4))
-		++pwm_input_counters[4];
+		++pwm_input_counters[4];*/
 
 	// NOTE: Can't use volatile loop variables
 	/*for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
@@ -187,6 +185,7 @@ ISR(PCINT0_vect)
 		// PCINT0 changed
 		// If PWM pin is on, start the counter
 		if (PINB & (1 << 0)) {
+			//pwm_input_counters[0] = 0;
 			pwm_inputs |= (1 << 0);
 		}
 
@@ -199,12 +198,15 @@ ISR(PCINT0_vect)
 				// Update the desired signals
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[0];	// Fix the slight error
-				pwm_desired[0] = pwm_input_counters[0]*20;	// Multiple by 20 scale
-
+				//if (pwm_input_counters[0] > 110) {
+					pwm_desired[0] = pwm_input_counters[0]*20;	// Multiple by 20 scale
+				//	UART::writeByte(pwm_input_counters[0]);
+					//pwm_input_counters[0] = 0;	// TODO: DOn't really need theses...
+				//}
 			}
 		}
 	}
-	if (changedbits & (1 << 1))
+	/*if (changedbits & (1 << 1))
 	{
 		// PCINT1 changed
 		// If PWM pin is on, start the counter
@@ -220,7 +222,6 @@ ISR(PCINT0_vect)
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[1];	// Fix the slight error
 				pwm_desired[1] = pwm_input_counters[1]*20;	// Multiple by 20 scale
-
 			}
 		}
 	}
@@ -280,5 +281,5 @@ ISR(PCINT0_vect)
 
 			}
 		}
-	}
+	}*/
 }
