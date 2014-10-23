@@ -41,7 +41,7 @@ volatile uint8_t pwm_input_pins[PWM_CHANNELS] = { INPUT_PWM };
 // Pin history for the input change interrupt
 volatile uint8_t portbhistory = 0xFF;
 
-volatile bool test = 0;
+volatile bool telemetry_update = 0;
 
 int main()
 {
@@ -103,9 +103,10 @@ int main()
 	uint8_t data = 0;
 	while(1) 
 	{	
+		//UART::writeByte('a');
 		// NOTE: UART requires a common ground, even through FTDI
 		//while (!uavtalk.read());
-		/*if (test) {
+		if (telemetry_update) {
 			if(uavtalk.read()) {
 				uint32_t temp; 
 				memcpy(&temp, &uavtalk.uav_roll, sizeof(float));
@@ -114,8 +115,8 @@ int main()
 				UART::writeByte(temp >> 8);
 				UART::writeByte(temp);
 			}
-			test = 0;
-		}*/
+			telemetry_update = 0;	
+		}
 	}
 
 	return 0;
@@ -130,11 +131,10 @@ ISR(TIMER1_COMPA_vect)
 	PORTC |= (1 << pwm_output_pins[0]);
 	uint16_t sum = 0;
 	for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
-		pwm_input_counters[i] = 0;
 		sum += pwm_desired[i];
 		pwm_desired_sums[i] = sum;
 	}
-	//test = 1;
+	telemetry_update = 1;	// Update the telemetry every 20ms
 }
 
 ISR(TIMER1_COMPB_vect)
@@ -155,17 +155,16 @@ ISR(TIMER1_COMPB_vect)
 ISR(TIMER0_COMPA_vect)
 {
 	// Loops seem to suck in interrupts
-	if (pwm_inputs & (1 << 0)) {
+	if (pwm_inputs & (1 << 0))
 		++pwm_input_counters[0];
-	}
-	/*if (pwm_inputs & (1 << 1))
+	if (pwm_inputs & (1 << 1))
 		++pwm_input_counters[1];
 	if (pwm_inputs & (1 << 2))
 		++pwm_input_counters[2];
 	if (pwm_inputs & (1 << 3))
 		++pwm_input_counters[3];
 	if (pwm_inputs & (1 << 4))
-		++pwm_input_counters[4];*/
+		++pwm_input_counters[4];
 
 	// NOTE: Can't use volatile loop variables
 	/*for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
@@ -185,7 +184,6 @@ ISR(PCINT0_vect)
 		// PCINT0 changed
 		// If PWM pin is on, start the counter
 		if (PINB & (1 << 0)) {
-			//pwm_input_counters[0] = 0;
 			pwm_inputs |= (1 << 0);
 		}
 
@@ -198,15 +196,12 @@ ISR(PCINT0_vect)
 				// Update the desired signals
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[0];	// Fix the slight error
-				//if (pwm_input_counters[0] > 110) {
-					pwm_desired[0] = pwm_input_counters[0]*20;	// Multiple by 20 scale
-				//	UART::writeByte(pwm_input_counters[0]);
-					//pwm_input_counters[0] = 0;	// TODO: DOn't really need theses...
-				//}
+				pwm_desired[0] = pwm_input_counters[0]*20;	// Multiple by 20 scale
+				pwm_input_counters[0] = 0;
 			}
 		}
 	}
-	/*if (changedbits & (1 << 1))
+	if (changedbits & (1 << 1))
 	{
 		// PCINT1 changed
 		// If PWM pin is on, start the counter
@@ -222,6 +217,7 @@ ISR(PCINT0_vect)
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[1];	// Fix the slight error
 				pwm_desired[1] = pwm_input_counters[1]*20;	// Multiple by 20 scale
+				pwm_input_counters[1] = 0;
 			}
 		}
 	}
@@ -240,7 +236,7 @@ ISR(PCINT0_vect)
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[2];	// Fix the slight error
 				pwm_desired[2] = pwm_input_counters[2]*20;	// Multiple by 20 scale
-
+				pwm_input_counters[2] = 0;
 			}
 		}
 	}
@@ -259,7 +255,7 @@ ISR(PCINT0_vect)
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[3];	// Fix the slight error
 				pwm_desired[3] = pwm_input_counters[3]*20;	// Multiple by 20 scale
-
+				pwm_input_counters[3] = 0;
 			}
 		}
 	}
@@ -278,8 +274,8 @@ ISR(PCINT0_vect)
 				// Read times are usually about 10-20us less than actual
 				++pwm_input_counters[4];	// Fix the slight error
 				pwm_desired[4] = pwm_input_counters[4]*20;	// Multiple by 20 scale
-
+				pwm_input_counters[4] = 0;
 			}
 		}
-	}*/
+	}
 }

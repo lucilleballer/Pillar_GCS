@@ -86,6 +86,7 @@ int UAVTalk::read() {
 	uint32_t temp = 0;
 	float f;
 	uint8_t c = readByte();
+	//cerr << c;
 	temp |= c << 24;
 	c = readByte();
 	temp |= c << 16;
@@ -94,7 +95,6 @@ int UAVTalk::read() {
 	c = serial->read(1).at(0);
 	temp |= c;
 	memcpy(&f, &temp, sizeof(float));
-	//cout << f << endl;
 	serial->clear(QSerialPort::Input);
 	mainwindow->updateAttitudeState(f, 0, 0);
 	/*serial->waitForReadyRead(50);
