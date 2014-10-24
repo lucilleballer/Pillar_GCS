@@ -26,8 +26,6 @@
 // PWM Inputs on PORTB
 #define INPUT_PWM 0,1,2,3,4
 
-volatile uint32_t pwm_output_counter = 0;
-
 // PWM Variables for control signals
 volatile uint8_t pwm_inputs = 0;		// Indicates which inputs are counting
 volatile uint8_t pwm_outputs = 0;	// Indicates which outputs are on
@@ -36,12 +34,19 @@ volatile uint16_t pwm_input_counters[PWM_CHANNELS];
 volatile uint16_t pwm_desired[PWM_CHANNELS];
 volatile uint16_t pwm_desired_sums[PWM_CHANNELS];
 uint8_t pwm_output_pins[PWM_CHANNELS] = { OUTPUT_PWM };
-volatile uint8_t pwm_input_pins[PWM_CHANNELS] = { INPUT_PWM };
+uint8_t pwm_input_pins[PWM_CHANNELS] = { INPUT_PWM };
 
 // Pin history for the input change interrupt
-volatile uint8_t portbhistory = 0xFF;
+uint8_t portbhistory = 0xFF;
 
+// Update telemetry boolean
 volatile bool telemetry_update = 0;
+
+// RC watchdog counter
+volatile uint8_t watchdog_counter = 0;
+
+// Autopilot State
+volatile uint8_t auto_state = 0;
 
 int main()
 {
@@ -58,8 +63,9 @@ int main()
 		// Activate PWM input pull-up resistors
 		PORTB |= (1 << pwm_input_pins[i]);
 	}
-	DDRC = 0xFF;
 	DDRD = 0xFE;
+	DDRB |= (1 << 5);
+	PORTB |= (1 << 5);
 
 	// Setup 16-bit timer for CTC prescale = 1
 	// TODO: OCR1A > OCR1B
@@ -103,10 +109,12 @@ int main()
 	uint8_t data = 0;
 	while(1) 
 	{	
-		//UART::writeByte('a');
-		// NOTE: UART requires a common ground, even through FTDI
-		//while (!uavtalk.read());
-		if (telemetry_update) {
+		// TODO: Add a check on uav incoming data limits
+		// Telemetry is updated every 20ms (can be faster)
+		// For testing, forward uav_roll to UART
+		// TODO: Check if data is being received
+		// else the read will hang (check newData)
+		/*if (telemetry_update) {
 			if(uavtalk.read()) {
 				uint32_t temp; 
 				memcpy(&temp, &uavtalk.uav_roll, sizeof(float));
@@ -116,7 +124,7 @@ int main()
 				UART::writeByte(temp);
 			}
 			telemetry_update = 0;	
-		}
+		}*/
 	}
 
 	return 0;
@@ -127,23 +135,58 @@ ISR(TIMER1_COMPA_vect)
 {
 	// Increment the 20ms PWM counter
 	pwm_outputs = 0x01;
-	pwm_output_counter = 0;	// restart the 20ms counter
-	PORTC |= (1 << pwm_output_pins[0]);
+	if (pwm_desired[0] > 0 && auto_state != 1)
+		PORTC |= (1 << pwm_output_pins[0]);
 	uint16_t sum = 0;
 	for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
 		sum += pwm_desired[i];
 		pwm_desired_sums[i] = sum;
 	}
 	telemetry_update = 1;	// Update the telemetry every 20ms
+
+	// Check state
+	// If lost connection
+	if (auto_state == 1) {
+		for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
+			// For now just zero everything
+			pwm_desired[i] = 0;
+		}
+	} else if (auto_state == 0) {
+		pwm_desired[0] = 2000;
+		pwm_desired[1] = 2500;
+		pwm_desired[2] = 3000;
+		pwm_desired[3] = 3500;
+		pwm_desired[4] = 4000;
+	}
+
+	// If no inputs from receiver, increment watchdog
+	// If the watchdog_counter is past 5, assume connection lost
+	if(++watchdog_counter > 5) {
+		auto_state = 1;
+		//portbhistory = 0xFF;
+		pwm_inputs = 0;
+		pwm_input_counters[0] = 0;
+		pwm_input_counters[1] = 0;
+		pwm_input_counters[2] = 0;
+		pwm_input_counters[3] = 0;
+		pwm_input_counters[4] = 0;
+		PORTC &= ~(1 << 0);
+		PORTC &= ~(1 << 1);
+		PORTC &= ~(1 << 2);
+		PORTC &= ~(1 << 3);
+		PORTC &= ~(1 << 4);
+	}
 }
 
+// Timer 1 Interrupt for B
 ISR(TIMER1_COMPB_vect)
 {
 	if (pwm_outputs > 0) {
 		PORTC &= ~(1 << pwm_output_pins[pwm_outputs-1]);
 		if (pwm_outputs < PWM_CHANNELS) {
 			OCR1B = pwm_desired_sums[pwm_outputs];
-			PORTC |= (1 << pwm_output_pins[pwm_outputs]);
+			if (pwm_desired[pwm_outputs] > 0)
+				PORTC |= (1 << pwm_output_pins[pwm_outputs]);
 			++pwm_outputs;
 		} else {
 			OCR1B = pwm_desired_sums[0];
@@ -176,9 +219,15 @@ ISR(TIMER0_COMPA_vect)
 // Pin change interrupt for PCINT7..0
 ISR(PCINT0_vect)
 {
+	// TODO: See if loops could work 
+	// Loops seem to not work well in interrupts
 	uint8_t changedbits;
 	changedbits = PINB ^ portbhistory;
 	portbhistory = PINB;
+
+	watchdog_counter = 0;
+	auto_state = 0;
+
 	if (changedbits & (1 << 0))
 	{
 		// PCINT0 changed
@@ -261,6 +310,8 @@ ISR(PCINT0_vect)
 	}
 	if (changedbits & (1 << 4))
 	{
+		watchdog_counter = 0;
+
 		// PCINT4 changed
 		if (PINB & (1 << 4)) {
 			pwm_inputs |= (1 << 4);
