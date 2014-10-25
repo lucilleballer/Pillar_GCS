@@ -46,7 +46,16 @@ volatile bool telemetry_update = 0;
 volatile uint8_t watchdog_counter = 0;
 
 // Autopilot State
-volatile uint8_t auto_state = 0;
+typedef enum {
+	AUTOPILOT_MANUAL,
+	AUTOPILOT_TAKEOFF,
+	AUTOPILOT_ALTITUDEHOLD,
+	AUTOPILOT_TEST,
+	AUTOPILOT_LAND,
+	AUTOPILOT_EMERGENCY
+} AutopilotState;
+volatile AutopilotState autopilot_state = AUTOPILOT_MANUAL;
+
 
 int main()
 {
@@ -105,7 +114,6 @@ int main()
 		pwm_desired_sums[i] = sum;
 	}
 
-	uint8_t data = 0;
 	while(1) 
 	{	
 		// TODO: Add a check on uav incoming data limits
@@ -127,17 +135,24 @@ int main()
 
 		// TEST: Check the flight mode switch 
 		// Switch the LED
-		if (pwm_desired[4] < 2000) {
-			//PORTB |= (1 << 5);	
-		} else {
-			//PORTB &= ~(1 << 5);
+		if (autopilot_state != AUTOPILOT_EMERGENCY && pwm_desired[4] > 3500) {
+			PORTB |= (1 << 5);	
+			autopilot_state = AUTOPILOT_TEST;
+			pwm_desired[0] = 2000;
+			pwm_desired[1] = 2500;
+			pwm_desired[2] = 3000;
+			pwm_desired[3] = 3500;
+			pwm_desired[4] = 4000;
+		} else if (pwm_desired[4] < 2250) {
+			PORTB &= ~(1 << 5);
+			autopilot_state = AUTOPILOT_MANUAL;
 		}
 
 		// TEST: Both sticks to the right
 		if (pwm_desired[0] < 2350 && pwm_desired[3] < 2250) {
-			PORTB |= (1 << 5);	
+			//PORTB |= (1 << 5);	
 		} else {
-			PORTB &= ~(1 << 5);
+			//PORTB &= ~(1 << 5);
 		}
 	}
 
@@ -149,7 +164,7 @@ ISR(TIMER1_COMPA_vect)
 {
 	// Increment the 20ms PWM counter
 	pwm_outputs = 0x01;
-	if (pwm_desired[0] > 0 && auto_state != 1)
+	if (pwm_desired[0] > 0 && autopilot_state != AUTOPILOT_EMERGENCY)
 		PORTC |= (1 << pwm_output_pins[0]);
 	uint16_t sum = 0;
 	for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
@@ -160,12 +175,12 @@ ISR(TIMER1_COMPA_vect)
 
 	// Check state
 	// If lost connection
-	if (auto_state == 1) {
+	if (autopilot_state == AUTOPILOT_EMERGENCY) {
 		for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
 			// TODO: For now just zero everything
 			pwm_desired[i] = 0;
 		}
-	} else if (auto_state == 0) {
+	} else if (autopilot_state == AUTOPILOT_MANUAL) {
 		/*pwm_desired[0] = 2000;
 		pwm_desired[1] = 2500;
 		pwm_desired[2] = 3000;
@@ -176,7 +191,7 @@ ISR(TIMER1_COMPA_vect)
 	// If no inputs from receiver, increment watchdog
 	// If the watchdog_counter is past 5, assume connection lost
 	if(++watchdog_counter > 5) {
-		auto_state = 1;
+		autopilot_state = AUTOPILOT_EMERGENCY;
 		pwm_inputs = 0;
 		// TODO: Look into looping
 		pwm_input_counters[0] = 0;
@@ -211,15 +226,17 @@ ISR(TIMER1_COMPB_vect)
 
 ISR(TIMER0_COMPA_vect)
 {
-	// Loops seem to suck in interrupts
-	if (pwm_inputs & (1 << 0))
-		++pwm_input_counters[0];
-	if (pwm_inputs & (1 << 1))
-		++pwm_input_counters[1];
-	if (pwm_inputs & (1 << 2))
-		++pwm_input_counters[2];
-	if (pwm_inputs & (1 << 3))
-		++pwm_input_counters[3];
+	if (autopilot_state == AUTOPILOT_MANUAL) {
+		// Loops seem to suck in interrupts
+		if (pwm_inputs & (1 << 0))
+			++pwm_input_counters[0];
+		if (pwm_inputs & (1 << 1))
+			++pwm_input_counters[1];
+		if (pwm_inputs & (1 << 2))
+			++pwm_input_counters[2];
+		if (pwm_inputs & (1 << 3))
+			++pwm_input_counters[3];
+	}
 	if (pwm_inputs & (1 << 4))
 		++pwm_input_counters[4];
 
@@ -240,9 +257,11 @@ ISR(PCINT0_vect)
 	portbhistory = PINB;
 
 	watchdog_counter = 0;
-	auto_state = 0;
+	//autopilot_state = AUTOPILOT_MANUAL;
 
-	for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
+	uint8_t i = 0;
+	//if (autopilot_state != AUTOPILOT_MANUAL) i = 4;
+	for (; i < PWM_CHANNELS; ++i) {
 		if (changedbits & (1 << i))
 		{
 			// PCINT0 changed

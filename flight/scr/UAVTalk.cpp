@@ -34,7 +34,7 @@ const static uint8_t crc_table[] = {
 };
 
 UAVTalk::UAVTalk() {
-	initUART(57600, true);
+	//initUART(57600, true);
 
 	last_gcstelemetrystats_send = 0;
 	last_flighttelemetry_connect = 0;
