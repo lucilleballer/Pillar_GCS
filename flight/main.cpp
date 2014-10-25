@@ -65,7 +65,6 @@ int main()
 	}
 	DDRD = 0xFE;
 	DDRB |= (1 << 5);
-	PORTB |= (1 << 5);
 
 	// Setup 16-bit timer for CTC prescale = 1
 	// TODO: OCR1A > OCR1B
@@ -125,6 +124,21 @@ int main()
 			}
 			telemetry_update = 0;	
 		}*/
+
+		// TEST: Check the flight mode switch 
+		// Switch the LED
+		if (pwm_desired[4] < 2000) {
+			//PORTB |= (1 << 5);	
+		} else {
+			//PORTB &= ~(1 << 5);
+		}
+
+		// TEST: Both sticks to the right
+		if (pwm_desired[0] < 2350 && pwm_desired[3] < 2250) {
+			PORTB |= (1 << 5);	
+		} else {
+			PORTB &= ~(1 << 5);
+		}
 	}
 
 	return 0;
@@ -148,23 +162,23 @@ ISR(TIMER1_COMPA_vect)
 	// If lost connection
 	if (auto_state == 1) {
 		for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
-			// For now just zero everything
+			// TODO: For now just zero everything
 			pwm_desired[i] = 0;
 		}
 	} else if (auto_state == 0) {
-		pwm_desired[0] = 2000;
+		/*pwm_desired[0] = 2000;
 		pwm_desired[1] = 2500;
 		pwm_desired[2] = 3000;
 		pwm_desired[3] = 3500;
-		pwm_desired[4] = 4000;
+		pwm_desired[4] = 4000;*/
 	}
 
 	// If no inputs from receiver, increment watchdog
 	// If the watchdog_counter is past 5, assume connection lost
 	if(++watchdog_counter > 5) {
 		auto_state = 1;
-		//portbhistory = 0xFF;
 		pwm_inputs = 0;
+		// TODO: Look into looping
 		pwm_input_counters[0] = 0;
 		pwm_input_counters[1] = 0;
 		pwm_input_counters[2] = 0;
@@ -228,7 +242,32 @@ ISR(PCINT0_vect)
 	watchdog_counter = 0;
 	auto_state = 0;
 
-	if (changedbits & (1 << 0))
+	for (uint8_t i = 0; i < PWM_CHANNELS; ++i) {
+		if (changedbits & (1 << i))
+		{
+			// PCINT0 changed
+			// If PWM pin is on, start the counter
+			if (PINB & (1 << i)) {
+				pwm_inputs |= (1 << i);
+			}
+
+			// Detect when the inputs go low
+			else if (pwm_inputs & (1 << i)) {
+				if (!(PINB & (1 << i))) {
+					// Stop the PWM counter
+					pwm_inputs &= ~(1 << i);
+
+					// Update the desired signals
+					// Read times are usually about 10-20us less than actual
+					pwm_input_counters[i] += 3;	// Fix the slight error
+					pwm_desired[i] = pwm_input_counters[i]*20;	// Multiple by 20 scale
+					pwm_input_counters[i] = 0;
+				}
+			}
+		}
+	}	
+
+	/*if (changedbits & (1 << 0))
 	{
 		// PCINT0 changed
 		// If PWM pin is on, start the counter
@@ -328,5 +367,5 @@ ISR(PCINT0_vect)
 				pwm_input_counters[4] = 0;
 			}
 		}
-	}
+	}*/
 }
