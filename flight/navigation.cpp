@@ -21,23 +21,22 @@ float delta_lon, delta_lat,a, c, d;
 
 
 
-static float latlong_to_cm(float pos1, float pos2){
+static double latlong_to_dis(float pos1, float pos2){
 	delta_lon = pos2.lon - pos1.lon;
 	delta_lat = pos2.lat - pos1.lat;
-	a = sin(delta_lat/2)*sin(delta_lat/2) + 
+	double a = sin(delta_lat/2)*sin(delta_lat/2) + 
 		cos(pos1.lat) * cos(pos2.lat) * sin(delta_lon/2) * sin(delta_lon/2);
-	c = 2 * atan2(sqrt(a), sqrt(1-a));
-	d = 6371 * c;
+	double c = 2 * atan2(sqrt(a), sqrt(1-a));
+    return 6371 * c;
 }
-/*
-int main(){
 
-	
-	test = latlong_to_cm(current_location, dest_location);
-	printf ("The result is\n", test);
+static double latlong_to_bear(float pos1, float pos2){
+    double y = sin(pos2.lon - pos1.lon) * cos(pos2.lat);
+    double x = cos(pos1.lat) * sin(pos2.lat) - sin(pos1.lat)*cos(pos1.lat) * cos(pos2.lon - pos1.lon);
+    return atan2(y,x); 
 
+}
 
-}*/
 
 
 static void run_nav_updates(void)
@@ -77,7 +76,7 @@ static void calc_wp_distance()
 {
     if(autopilot_state= AUTO){
 
-		latlong_to_cm(float current_location, float destination);
+		wp_distance = latlong_to_dis( current_location,  destination);
        
     }
  
@@ -92,7 +91,7 @@ static void calc_wp_bearing()
     // get target from loiter or wpinav controller
     
    else if (control_mode == AUTO) {
-        wp_bearing = wp_nav.get_wp_bearing_to_destination();
+        wp_bearing = latlong_to_bear(current_location, destination);
     } else {
         wp_bearing = 0;
     }
